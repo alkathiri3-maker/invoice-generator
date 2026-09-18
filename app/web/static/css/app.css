@@ -368,3 +368,79 @@ tr.grp-items-row > td { background: #f8fafc; padding: 12px 14px; }
 .grp-items-box .gib-tbl thead th { background: #f1f5f9; color: #334155; font-size: 12px; }
 /* حقول وحدة الصنف في سطور الفاتورة اليدوية */
 #linesTable .ln-unit { width: 90px; text-align: center; }
+
+/* ═══ Responsive Design - للأجهزة اللوحية والجوال ═══ */
+@media (max-width: 1024px) {
+  .sidebar { width: 180px; }
+  html { font-size: 14px; }
+  .cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .grid2 { grid-template-columns: 1fr; gap: 0; }
+  .grid3 { grid-template-columns: 1fr 1fr; gap: 0 12px; }
+}
+
+@media (max-width: 768px) {
+  body { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; display: grid; grid-template-columns: auto 1fr; }
+  .brand { grid-column: 1; padding: 14px 16px; font-size: 15px; }
+  .sidebar nav { grid-column: 2; padding: 8px 12px; flex-direction: row; flex-wrap: wrap; }
+  .side-note { display: none; }
+  main { min-height: auto; }
+  .topbar { flex-wrap: wrap; padding: 12px 16px; }
+  .topbar h1 { flex: 1; min-width: 0; font-size: 17px; }
+  .content { padding: 16px 16px 30px; }
+  .cards { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .card { padding: 14px 12px; }
+  .card .k { font-size: 11px; }
+  .card .v { font-size: 20px; }
+  table.tbl { font-size: 12px; }
+  table.tbl th { padding: 8px 10px; }
+  table.tbl td { padding: 8px 10px; }
+  .panel { padding: 16px; margin-bottom: 14px; }
+  .btn { padding: 8px 14px; font-size: 12px; }
+  .btn.sm { padding: 4px 10px; font-size: 11px; }
+  label.f { font-size: 12px; margin: 10px 0 4px; }
+  input[type=text], input[type=number], input[type=date], input[type=tel],
+  input[type=password], select, textarea { font-size: 12px; padding: 8px 10px; }
+  .filters { gap: 8px; }
+  .filters > div { min-width: 120px; }
+  dialog { padding: 18px; width: min(500px, 95vw); }
+  dialog.wide { width: min(95vw, 100%); }
+  dialog.xl { width: min(97vw, 100%); max-height: 90vh; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 13px; }
+  .sidebar { grid-template-columns: 1fr; }
+  .brand { grid-column: 1; }
+  .sidebar nav { grid-column: 1; flex-direction: column; }
+  .side-note { margin: 8px; padding: 8px; font-size: 10px; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 10px; padding: 10px 14px; }
+  .topbar h1 { font-size: 15px; }
+  .topbar .actions { width: 100%; justify-content: flex-end; }
+  .content { padding: 12px 12px 24px; }
+  .cards { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+  .card { padding: 12px 10px; border-width: 3px; }
+  .card .k { font-size: 10px; }
+  .card .v { font-size: 18px; margin-top: 3px; }
+  .panel { padding: 14px; margin-bottom: 12px; }
+  .panel h2 { font-size: 14px; margin-bottom: 10px; }
+  table.tbl { font-size: 11px; }
+  table.tbl th { padding: 6px 8px; font-size: 10px; }
+  table.tbl td { padding: 6px 8px; }
+  .btn { padding: 6px 12px; font-size: 11px; gap: 4px; }
+  .btn.sm { padding: 3px 8px; font-size: 10px; }
+  label.f { font-size: 11px; margin: 8px 0 3px; }
+  input[type=text], input[type=number], input[type=date], input[type=tel],
+  input[type=password], select, textarea { font-size: 11px; padding: 6px 8px; }
+  .grid2, .grid3 { grid-template-columns: 1fr; gap: 0; }
+  .filters { gap: 6px; flex-direction: column; }
+  .filters label.f { margin: 0 0 3px; }
+  .filters > div { width: 100%; min-width: auto; }
+  dialog { padding: 14px; width: min(95vw, 100%); }
+  dialog h3 { font-size: 14px; }
+  .dlg-actions { flex-direction: column; }
+  .dlg-actions .btn { width: 100%; justify-content: center; }
+  .badge { padding: 2px 8px; font-size: 10px; }
+  .toast { font-size: 12px; padding: 10px 16px; max-width: 85vw; }
+  textarea.code { min-height: 200px; font-size: 11px; }
+}
