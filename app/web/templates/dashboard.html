@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block title %}الرئيسية — {{ APP_NAME }}{% endblock %}
+{% block page_title %}لوحة المعلومات{% endblock %}
+{% block actions %}
+<a class="btn" href="{{ url_for('pages.generate') }}">⚙️ توليد دفعة جديدة</a>
+{% endblock %}
+{% block content %}
+{% if backup_warning %}
+<div class="warn-strip">
+  💾 <b>تنبيه:</b>
+  {% if backup_age < 0 %}لم يتم إنشاء أي نسخة احتياطية بعد — احمِ بياناتك الآن.
+  {% else %}آخر نسخة احتياطية مرّ عليها {{ backup_age }} يومًا — يُنصح بإنشاء نسخة جديدة.
+  {% endif %}
+  <a class="btn sm" href="{{ url_for('pages.settings_screen') }}">الإعدادات والأمان 🛡️</a>
+</div>
+{% endif %}
+<div class="cards">
+  <div class="card"><div class="k">إجمالي الفواتير</div><div class="v">{{ stats.invoices }}</div></div>
+  <div class="card green"><div class="k">إجمالي شامل الضريبة</div><div class="v">{{ stats.gross|sar }} ر.س</div></div>
+  <div class="card red"><div class="k">إجمالي الضريبة (15%)</div><div class="v">{{ stats.tax|sar }} ر.س</div></div>
+  <div class="card"><div class="k">السندات المرافقة</div><div class="v">{{ stats.receipts }}</div></div>
+  <div class="card"><div class="k">الشركات / العملاء</div><div class="v">{{ stats.companies }} / {{ stats.customers }}</div></div>
+  <div class="card"><div class="k">الأصناف المتاحة</div><div class="v">{{ stats.items }}</div></div>
+</div>
+
+<div class="panel">
+  <h2>📦 أحدث الدفعات المولدة</h2>
+  {% if batches %}
+  <table class="tbl">
+    <thead>
+      <tr><th>#</th><th>التاريخ</th><th>عدد الفواتير</th><th class="num">الصافي</th><th class="num">الضريبة</th><th class="num">الإجمالي</th><th>البذرة</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for b in batches %}
+      <tr>
+        <td><b>{{ b.id }}</b></td>
+        <td>{{ b.created_at[:16] }}</td>
+        <td>{{ b.invoice_count }}</td>
+        <td class="num">{{ b.total_net|sar }}</td>
+        <td class="num">{{ b.total_tax|sar }}</td>
+        <td class="num"><b>{{ b.total_gross|sar }}</b></td>
+        <td><span class="badge blue">{{ b.seed or '—' }}</span></td>
+        <td><a class="btn sm ghost" href="{{ url_for('pages.invoices', batch_id=b.id) }}">عرض</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">لا توجد دفعات بعد — ابدأ من شاشة «توليد الفواتير» ⚙️</div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2>🚀 خطوات سريعة</h2>
+  <p class="muted" style="line-height:2.2">
+    1️⃣ راجع بيانات <a href="{{ url_for('pages.companies') }}">الشركات</a> و
+    <a href="{{ url_for('pages.customers') }}">العملاء</a> و
+    <a href="{{ url_for('pages.items') }}">الأصناف</a>.<br>
+    2️⃣ اذهب إلى <a href="{{ url_for('pages.generate') }}">شاشة التوليد</a> وحدد المبلغ الإجمالي والفترة والخيارات.<br>
+    3️⃣ اضغط «توليد دفعة» ثم استعرض الفواتير وصدّرها PDF من
+    <a href="{{ url_for('pages.invoices') }}">الفواتير الناتجة</a>.
+  </p>
+</div>
+{% endblock %}

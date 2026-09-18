@@ -1,0 +1,108 @@
+{% extends "layout.html" %}
+{% block title %}السندات — {{ APP_NAME }}{% endblock %}
+{% block page_title %}السندات{% endblock %}
+{% block actions %}
+<button class="btn green" onclick="exportDocs('combined', this)">📄 تصدير PDF واحد</button>
+<button class="btn" onclick="exportDocs('zip', this)">🗂 تصدير منفصل ZIP</button>
+<button class="btn ghost" onclick="printSelected(this)">🖨️ طباعة المحددة</button>
+{% endblock %}
+{% block content %}
+<form class="panel" method="get" action="/receipts">
+  <h2>🔎 تصفية</h2>
+  <div class="filters">
+    <div>
+      <label class="f">الدفعة</label>
+      <select name="batch_id" onchange="this.form.submit()">
+        <option value="">كل الدفعات</option>
+        {% for b in batches %}
+        <option value="{{ b.id }}" {{ 'selected' if f_batch|string == b.id|string }}>دفعة #{{ b.id }} — {{ b.created_at[:10] }} ({{ b.invoice_count }} فاتورة)</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label class="f">بحث (رقم / عميل)</label><input type="text" name="q" value="{{ f_q }}"></div>
+    <div><label class="f">من تاريخ</label><input type="date" name="date_from" value="{{ f_from }}"></div>
+    <div><label class="f">إلى تاريخ</label><input type="date" name="date_to" value="{{ f_to }}"></div>
+    <div style="flex:0"><button class="btn" type="submit">تطبيق</button></div>
+  </div>
+</form>
+
+<div class="summary-strip">
+  📊 النتائج المعروضة: <b>{{ rows|length }}</b> سند —
+  إجمالي المبالغ: <b>{{ total_amount|sar }} ر.س</b>
+  (<span class="muted">ملاحظة: بعض السندات تُربط بفاتورة — عمود «الفاتورة» يوضح العلاقة</span>)
+</div>
+
+<div class="panel">
+  <h2>🧾 السندات</h2>
+  {% if rows %}
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="selAll" title="تحديد الكل"></th>
+        <th>الرقم</th><th>التاريخ</th><th>الوقت</th><th>النوع</th>
+        <th>العميل</th><th>الشركة</th><th class="num">المبلغ</th>
+        <th>الفاتورة المرتبطة</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}">
+        <td><input type="checkbox" class="sel" value="{{ r.id }}"></td>
+        <td><b>{{ r.receipt_number }}</b></td>
+        <td>{{ r.receipt_date|adate }}</td>
+        <td class="muted">{{ r.receipt_time[:5] }}</td>
+        <td>{% if r.type == 'قبض' %}<span class="badge green">قبض</span>{% else %}<span class="badge amber">صرف</span>{% endif %}</td>
+        <td>{{ r.customer_name }}</td>
+        <td class="muted">{{ r.company_name }}</td>
+        <td class="num"><b>{{ r.amount|sar }}</b></td>
+        <td>{% if r.related_invoice_id %}<a href="/invoices/{{ r.related_invoice_id }}/preview" target="_blank">🧾 {{ r.related_invoice_id }}</a>{% else %}—{% endif %}</td>
+        <td style="white-space:nowrap">
+          <a class="btn sm" target="_blank" href="/receipts/{{ r.id }}/preview">👁 معاينة</a>
+          <button class="btn sm ghost" onclick="exportOne({{ r.id }}, this)">📄 PDF</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">لا توجد سندات مطابقة</div>{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('selAll')?.addEventListener('change', function () {
+  document.querySelectorAll('tr[data-id] input.sel').forEach(cb => cb.checked = this.checked);
+});
+async function exportDocs(mode, btn) {
+  const p = new URLSearchParams(location.search);
+  const label = mode === 'zip' ? '🗂 جارٍ تصدير الملفات المنفصلة…' : '📄 جارٍ بناء PDF…';
+  btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = label;
+  try {
+    const j = await api('/api/export', { kind: 'receipt', mode, batch_id: p.get('batch_id') || undefined });
+    toast('✅ اكتمل التصدير (' + (j.engine || 'edge') + ')');
+    setTimeout(() => { location.href = '/exports/' + encodeURIComponent(j.file); }, 700);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = btn.dataset.t; }
+}
+async function exportOne(id, btn) {
+  btn.disabled = true;
+  try {
+    const j = await api('/api/export', { kind: 'receipt', mode: 'combined', ids: [id] });
+    toast('✅ تم إنشاء PDF');
+    setTimeout(() => { window.open('/exports/' + encodeURIComponent(j.file), '_blank'); }, 500);
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+}
+async function printSelected(btn) {
+  const ids = Array.from(document.querySelectorAll('tr[data-id] input.sel:checked'))
+    .map(i => parseInt(i.value));
+  if (!ids.length) { toast('اختر سند واحد على الأقل', true); return; }
+  btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '⏳ جارٍ البناء…';
+  try {
+    const j = await api('/api/export', { kind: 'receipt', mode: 'combined', ids });
+    window.open('/exports/' + encodeURIComponent(j.file), '_blank');
+    toast('✅ PDF جاهز — اطبعه من المتصفح');
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = btn.dataset.t; }
+}
+</script>
+{% endblock %}

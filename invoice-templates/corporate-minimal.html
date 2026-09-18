@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الفاتورة - Invoice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .invoice-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header Banner */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #0066cc;
+            padding-bottom: 25px;
+            margin-bottom: 30px;
+        }
+
+        .company-info h1 {
+            font-size: 28px;
+            color: #0066cc;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .company-info p {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .invoice-title {
+            text-align: center;
+        }
+
+        .invoice-title h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .invoice-title p {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .invoice-number {
+            text-align: left;
+        }
+
+        .invoice-number h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .invoice-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 12px;
+        }
+
+        .meta-block {
+            flex: 1;
+        }
+
+        .meta-block label {
+            color: #999;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .meta-block value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        /* Party Information */
+        .parties {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 12px;
+        }
+
+        .party {
+            flex: 1;
+        }
+
+        .party h4 {
+            color: #0066cc;
+            font-size: 13px;
+            margin-bottom: 10px;
+            font-weight: 700;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+
+        .party-details {
+            color: #333;
+            line-height: 1.8;
+        }
+
+        .party-details p {
+            margin-bottom: 5px;
+        }
+
+        /* Items Table */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            font-size: 12px;
+        }
+
+        .items-table thead {
+            background: #f0f0f0;
+            border-top: 1px solid #ddd;
+            border-bottom: 2px solid #0066cc;
+        }
+
+        .items-table th {
+            padding: 12px;
+            text-align: right;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .items-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: right;
+        }
+
+        .items-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .item-description {
+            font-size: 11px;
+            color: #999;
+            margin-top: 3px;
+        }
+
+        .item-qty,
+        .item-price,
+        .item-tax,
+        .item-total {
+            text-align: center;
+            width: 80px;
+        }
+
+        /* Summary Section */
+        .summary {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 30px;
+        }
+
+        .summary-box {
+            width: 320px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .summary-row label {
+            font-weight: 600;
+        }
+
+        .summary-row.subtotal {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 12px;
+        }
+
+        .summary-row.tax {
+            color: #0066cc;
+        }
+
+        .summary-row.total {
+            border-top: 2px solid #0066cc;
+            padding-top: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #0066cc;
+        }
+
+        /* Bank Transfer Section */
+        .bank-section {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+
+        .bank-section h4 {
+            color: #0066cc;
+            font-size: 13px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .bank-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            font-size: 12px;
+        }
+
+        .bank-detail {
+            padding: 10px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+        }
+
+        .bank-detail label {
+            color: #999;
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .bank-detail value {
+            color: #333;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        /* Footer */
+        .footer {
+            border-top: 1px solid #e0e0e0;
+            padding-top: 20px;
+            font-size: 11px;
+            color: #999;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .footer p {
+            margin-bottom: 8px;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .invoice-container {
+                box-shadow: none;
+                max-width: 100%;
+                padding: 0;
+            }
+
+            * {
+                box-shadow: none !important;
+            }
+
+            a {
+                text-decoration: none;
+                color: #0066cc;
+            }
+        }
+
+        /* RTL Support */
+        [dir="rtl"] .invoice-meta {
+            flex-direction: row-reverse;
+        }
+
+        [dir="rtl"] .parties {
+            flex-direction: row-reverse;
+        }
+
+        [dir="rtl"] .summary {
+            justify-content: flex-start;
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="company-info">
+                <h1>{{ company.name }}</h1>
+                <p>{{ company.address }}</p>
+                <p>{{ company.phone }}</p>
+            </div>
+            <div class="invoice-title">
+                <h2>الفاتورة الضريبية</h2>
+                <p>Tax Invoice</p>
+            </div>
+            <div class="invoice-number">
+                <h3>الفاتورة #{{ inv.number }}</h3>
+                <p>Invoice #{{ inv.number }}</p>
+            </div>
+        </div>
+
+        <!-- Meta Information -->
+        <div class="invoice-meta">
+            <div class="meta-block">
+                <label>تاريخ الفاتورة / Invoice Date:</label>
+                <value>{{ inv.date_display }}</value>
+            </div>
+            <div class="meta-block">
+                <label>تاريخ الاستحقاق / Due Date:</label>
+                <value>{{ inv.due_date }}</value>
+            </div>
+            <div class="meta-block">
+                <label>رقم الضريبة / VAT Number:</label>
+                <value>{{ company.tax_number }}</value>
+            </div>
+        </div>
+
+        <!-- Parties -->
+        <div class="parties">
+            <div class="party">
+                <h4>من / From:</h4>
+                <div class="party-details">
+                    <p><strong>{{ company.name }}</strong></p>
+                    <p>{{company_full_address}}</p>
+                    <p>{{company_tax_id}}</p>
+                </div>
+            </div>
+            <div class="party">
+                <h4>إلى / To:</h4>
+                <div class="party-details">
+                    <p><strong>{{ customer.name }}</strong></p>
+                    <p>{{ customer.address }}</p>
+                    <p>{{ customer.tax_number }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>الوصف / Description</th>
+                    <th>الكمية / Qty</th>
+                    <th>السعر / Price</th>
+                    <th>الضريبة / Tax</th>
+                    <th>الإجمالي / Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in inv.lines %}
+                <tr>
+                    <td>
+                        <div class="item-name">{{ line.name }}</div>
+                        <div class="item-description">{{ line.description or "" }}</div>
+                    </td>
+                    <td class="item-qty">{{ line.quantity_display }}</td>
+                    <td class="item-price">{{ line.unit_price_display }} ر.س</td>
+                    <td class="item-tax">{{ line.line_tax_display }} ر.س</td>
+                    <td class="item-total">{{ line.line_gross_display }} ر.س</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Summary -->
+        <div class="summary">
+            <div class="summary-box">
+                <div class="summary-row subtotal">
+                    <label>الإجمالي قبل الضريبة / Subtotal:</label>
+                    <span>{{ inv.subtotal_display }} ر.س</span>
+                </div>
+                <div class="summary-row tax">
+                    <label>ضريبة القيمة المضافة (15%) / VAT (15%):</label>
+                    <span>{{ inv.tax_display }} ر.س</span>
+                </div>
+                <div class="summary-row total">
+                    <label>المجموع / Total:</label>
+                    <span>{{ inv.total_display }} ر.س</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bank Transfer Section -->
+        <div class="bank-section">
+            <h4>تفاصيل التحويل البنكي / Bank Transfer Details:</h4>
+            <div class="bank-details">
+                <div class="bank-detail">
+                    <label>اسم البنك / Bank Name:</label>
+                    <value>{{ inv.bank_name or "" }}</value>
+                </div>
+                <div class="bank-detail">
+                    <label>IBAN:</label>
+                    <value>{{ inv.bank_iban or "" }}</value>
+                </div>
+                <div class="bank-detail">
+                    <label>رقم الحساب / Account Number:</label>
+                    <value>{{ inv.bank_account or "" }}</value>
+                </div>
+                <div class="bank-detail">
+                    <label>رمز السويفت / Swift Code:</label>
+                    <value>{{ inv.bank_swift or "" }}</value>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>شكراً لتعاملك معنا / Thank you for your business</p>
+            <p>{{ company.website }} | {{ company.email }}</p>
+            <p>هذه فاتورة ضريبية صادرة وفقاً لأنظمة الزكاة والضريبة على الدخل / This is a tax invoice issued in accordance with VAT regulations</p>
+        </div>
+    </div>
+</body>
+</html>

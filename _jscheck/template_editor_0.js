@@ -1,0 +1,1 @@
+window.SECURITY = {"password_set": true, "protect_delete": true, "protect_edit": true, "protect_restore": true};

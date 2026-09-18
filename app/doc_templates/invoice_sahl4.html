@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<!-- TPL_STYLE:{"qr_position":"below_totals","qr_size":"54"} -->
+{% set primary = theme.primary_color or company.color or '#1e293b' %}
+{% set head_text = theme.header_text_color or '#ffffff' %}
+<title>{{ doc_title }} رقم {{ inv.number }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Cairo', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+    color: #1c2230; background: #f1f5f9; font-size: 12px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .e2-doc {
+    position: relative; width: 210mm; min-height: 297mm; margin: 0 auto;
+    padding: 12mm 10mm 15mm; background: #fff; overflow: hidden;
+    box-shadow: 0 2px 14px rgba(0,0,0,.14);
+  }
+  /* العلامة المائية */
+  .e2-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+  .e2-watermark span { transform: rotate(-32deg); font-size: 72px; font-weight: 800; color: rgba(220,38,38,.08); border: 5px solid rgba(220,38,38,.20); border-radius: 18px; padding: 6px 30px; white-space: nowrap; }
+
+  .e2-alert { border-radius: 6px; padding: 8px 12px; font-weight: 800; font-size: 11px; text-align: center; line-height: 1.7; margin-bottom: 12px; }
+  .e2-doc > *:not(.e2-watermark) { position: relative; z-index: 1; }
+
+  /* ===== الترويسة ===== */
+  .e2-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding-bottom: 12px; border-bottom: 3px solid {{ primary }}; margin-bottom: 14px; }
+  .e2-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .e2-logo { max-width: 24mm; max-height: 24mm; object-fit: contain; }
+  .e2-logo-fb { width: 19mm; height: 19mm; border-radius: 9px; background: {{ primary }}; color: {{ head_text }}; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+  .e2-company { font-size: 20px; font-weight: 800; color: {{ primary }}; line-height: 1.3; }
+  .e2-meta { font-size: 11px; color: #4b5563; line-height: 1.8; margin-top: 4px; }
+  .e2-meta b { color: #111827; }
+  .e2-titles { text-align: left; white-space: nowrap; }
+  .e2-t-ar { font-size: 22px; font-weight: 800; color: {{ primary }}; line-height: 1.2; }
+  .e2-t-en { font-size: 11px; letter-spacing: 1px; color: #64748b; border-bottom: 2px solid {{ primary }}; display: inline-block; padding-bottom: 2px; font-weight: 600; }
+
+  /* ===== بطاقة العميل + شبكة البيانات ===== */
+  .e2-meta2 { display: flex; gap: 10px; margin-bottom: 14px; page-break-inside: avoid; }
+  .e2-customer { flex: 1.2; border: 1.4px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; background: #f8fafc; }
+  .e2-customer h3 { font-size: 11px; color: {{ primary }}; font-weight: 800; margin-bottom: 6px; display: flex; gap: 7px; align-items: baseline; }
+  .e2-customer h3 .en { font-size: 9px; color: #9aa3af; font-weight: 500; letter-spacing: .5px; }
+  .e2-customer .nm { font-size: 13.5px; font-weight: 800; color: #111827; margin-bottom: 4px; }
+  .e2-customer .row { font-size: 11px; color: #374151; line-height: 1.8; }
+  .e2-customer .row .k { color: #64748b; }
+  .e2-customer .row b { color: #111827; }
+
+  .e2-info { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .e2-field { border: 1.3px solid #cbd5e1; border-radius: 6px; padding: 6px 8px; background: #fff; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .e2-field .lb { font-size: 9px; color: #64748b; display: flex; justify-content: space-between; align-items: center; line-height: 1.2; }
+  .e2-field .lb .en { font-size: 8px; letter-spacing: .4px; color: #94a3b8; }
+  .e2-field .val { font-size: 11.5px; font-weight: 700; color: #111827; word-break: break-word; }
+
+  /* ===== جدول الأصناف ===== */
+  table.e2-items { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 14px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+  table.e2-items thead { display: table-header-group; }
+  table.e2-items tr { page-break-inside: avoid; }
+  table.e2-items thead th { background: {{ primary }}; color: {{ head_text }}; font-size: 10.5px; font-weight: 700; padding: 8px 6px; text-align: center; border-bottom: 1px solid #cbd5e1; border-left: 1px solid rgba(255,255,255,.2); }
+  table.e2-items thead th:last-child { border-left: none; }
+  table.e2-items thead th small { display: block; font-size: 8px; font-weight: 500; opacity: .9; margin-top: 1px; }
+  table.e2-items tbody td { font-size: 11px; padding: 7px 6px; border-bottom: 1px solid #e2e8f0; border-left: 1px solid #e2e8f0; text-align: center; color: #334155; }
+  table.e2-items tbody tr:last-child td { border-bottom: none; }
+  table.e2-items tbody td:last-child { border-left: none; }
+  table.e2-items tbody td.dsc { text-align: right; font-weight: 600; color: #0f172a; }
+  table.e2-items tbody tr:nth-child(even) { background: #f8fafc; }
+  table.e2-items tbody td .code { display: block; font-size: 8.5px; color: #64748b; font-weight: 500; }
+
+  /* ===== صندوق الإجماليات والمدفوع ===== */
+  .e2-sums-wrap { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-top: 6px; page-break-inside: avoid; }
+  .e2-words { flex: 1.4; font-size: 11px; color: #475569; line-height: 1.8; }
+  .e2-words .t { font-size: 11.5px; font-weight: 800; color: {{ primary }}; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .e2-words .t .en { font-size: 8.5px; color: #94a3b8; font-weight: 500; }
+  .e2-words .tafqit { border: 1.4px dashed {{ primary }}; border-radius: 8px; background: #f8fafc; padding: 8px 12px; font-weight: 700; color: #0f172a; }
+  .e2-notes { font-size: 10.5px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 10px; }
+
+  table.e2-sums { border-collapse: separate; border-spacing: 0; width: 270px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+  table.e2-sums td { padding: 6px 10px; font-size: 11.5px; border-bottom: 1px solid #e2e8f0; }
+  table.e2-sums tr:last-child td { border-bottom: none; }
+  table.e2-sums td.lbl { background: #f1f5f9; font-weight: 700; color: #334155; width: 55%; }
+  table.e2-sums td.lbl small { display: block; font-size: 8px; color: #64748b; font-weight: 500; }
+  table.e2-sums td.num { text-align: left; font-weight: 700; direction: ltr; color: #0f172a; }
+  table.e2-sums tr.e2-gtotal td { background: #e2e8f0; font-weight: 800; color: #0f172a; }
+  table.e2-sums tr.e2-paid td { background: {{ primary }}; color: {{ head_text }}; font-weight: 800; font-size: 12.5px; }
+  table.e2-sums tr.e2-paid td.lbl small { color: {{ head_text }}; opacity: .85; }
+
+  /* ===== التوقيع والختم ===== */
+  .e2-sign-wrap { margin-top: 12px; display: flex; justify-content: flex-end; page-break-inside: avoid; }
+  .e2-sign { font-size: 11px; color: #64748b; text-align: center; font-weight: 600; }
+  .e2-sign .ln { width: 140px; border-top: 1px solid #cbd5e1; margin: 16px auto 6px; }
+
+  /* أزرار التحكم والطباعة */
+  .e2-print { position: fixed; top: 12px; left: 12px; z-index: 99; background: {{ primary }}; color: #fff; border: 0; border-radius: 8px; padding: 9px 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.15); }
+
+  @media print {
+    body { background: #fff; }
+    .e2-doc { width: 100%; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
+    .e2-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<button class="e2-print" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+
+<div class="e2-doc">
+
+  {% if theme.show_watermark %}<div class="e2-watermark"><span>{{ watermark_text }}</span></div>{% endif %}
+
+  {% if theme.alert_banner_enabled and theme.alert_banner_text %}
+  <div class="e2-alert" style="color:{{ theme.alert_banner_color }};background:{{ theme.alert_banner_bg }};border:1.3px solid {{ theme.alert_banner_color }}">⚠ {{ theme.alert_banner_text }}</div>
+  {% endif %}
+
+  <!-- ===== الترويسة ===== -->
+  <div class="e2-top tpl-header">
+    <div class="e2-brand tpl-logo-wrap">
+      {% if company.logo_data_uri %}
+        <img class="e2-logo tpl-logo" src="{{ company.logo_data_uri }}" alt="شعار">
+      {% else %}
+        <div class="e2-logo-fb tpl-logo">{{ company.name[:1] }}</div>
+      {% endif %}
+      <div>
+        <div class="e2-company tpl-company">{{ company.name }}</div>
+        <div class="e2-meta tpl-meta">
+          <span>الرقم الضريبي: <b>{{ company.tax_number }}</b></span>
+          {% if company.cr_number %}<span style="color:#cbd5e1"> | </span><span>السجل التجاري: <b>{{ company.cr_number }}</b></span>{% endif %}
+          {% if company.address %}<br><span>{{ company.address }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="e2-titles">
+      <div class="e2-t-ar tpl-title">{{ doc_title }}</div>
+      <div class="e2-t-en">TAX INVOICE</div>
+    </div>
+  </div>
+
+  <!-- ===== بيانات العميل والفاتورة ===== -->
+  <div class="e2-meta2">
+    <div class="e2-customer tpl-cust">
+      <h3>العميل <span class="en">CUSTOMER</span></h3>
+      <div class="nm">{{ customer.name }}</div>
+      {% if customer.tax_number %}<div class="row"><span class="k">الرقم الضريبي:</span> <b>{{ customer.tax_number }}</b></div>{% endif %}
+      {# السجل التجاري للمشتري/العميل: يُعرض فور وجود قيمته ويُخفى تلقائيًا إذا كان الحقل فارغًا #}
+      {% if customer.cr_number %}<div class="row"><span class="k">السجل التجاري:</span> <b>{{ customer.cr_number }}</b></div>{% endif %}
+      {% if customer.address %}<div class="row"><span class="k">العنوان:</span> {{ customer.address }}</div>{% endif %}
+      {% if customer.phone %}<div class="row"><span class="k">الجوال:</span> <b>{{ customer.phone }}</b></div>{% endif %}
+    </div>
+
+    <div class="e2-info">
+      <div class="e2-field">
+        <div class="lb"><span>رقم الفاتورة</span><span class="en">Inv No</span></div>
+        <div class="val">{{ inv.number }}</div>
+      </div>
+      <div class="e2-field">
+        <div class="lb"><span>نوع الفاتورة</span><span class="en">Payment</span></div>
+        <div class="val">{{ inv.payment_type }}</div>
+      </div>
+      <div class="e2-field">
+        <div class="lb"><span>التاريخ</span><span class="en">Date</span></div>
+        <div class="val">{{ inv.date_display }}</div>
+      </div>
+      <div class="e2-field">
+        <div class="lb"><span>الوقت</span><span class="en">Time</span></div>
+        <div class="val" dir="ltr">{{ inv.time_display }}</div>
+      </div>
+      <div class="e2-field">
+        <div class="lb"><span>تاريخ الاستحقاق</span><span class="en">Due Date</span></div>
+        <div class="val">{{ inv.due_date_display or inv.date_display }}</div>
+      </div>
+      <div class="e2-field">
+        <div class="lb"><span>ملاحظات</span><span class="en">Notes</span></div>
+        <div class="val">{% if inv.notes %}{{ inv.notes }}{% else %}<span class="dash">—</span>{% endif %}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== جدول الأصناف ===== -->
+  <table class="e2-items">
+    <thead>
+      <tr>
+        <th style="width:5%">#<small>No</small></th>
+        <th style="width:35%">اسم الصنف / البيان<small>Item Description</small></th>
+        <th style="width:8%">الوحدة<small>Unit</small></th>
+        <th style="width:8%">الكمية<small>Qty</small></th>
+        <th style="width:11%">السعر<small>Price</small></th>
+        <th style="width:11%">الإجمالي<small>Subtotal</small></th>
+        <th style="width:10%">الضريبة<small>VAT</small></th>
+        <th style="width:12%">الصافي<small>Total</small></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ln in inv.lines %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td class="dsc">{{ ln.name }}{% if ln.code %}<span class="code">{{ ln.code }}</span>{% endif %}</td>
+        <td>{{ ln.unit }}</td>
+        <td>{{ ln.quantity_display }}</td>
+        <td>{{ ln.unit_price_display }}</td>
+        <td>{{ ln.line_net_display }}</td>
+        <td>{{ ln.line_tax_display }}</td>
+        <td><b>{{ ln.line_gross_display }}</b></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- ===== الإجماليات والتفقيط ===== -->
+  <div class="e2-sums-wrap">
+    <div class="e2-words">
+      <div class="t">المطلوب بالمبلغ مكتوباً <span class="en">AMOUNT IN WORDS</span></div>
+      <div class="tafqit">{{ inv.total_words }}</div>
+      {% if inv.notes %}<div class="e2-notes" style="margin-top:8px"><b>ملاحظات الفاتورة:</b> {{ inv.notes }}</div>{% endif %}
+    </div>
+    <table class="e2-sums">
+      <tr>
+        <td class="lbl">الإجمالي غير شامل الضريبة<small>Subtotal</small></td>
+        <td class="num">{{ inv.subtotal_display }}</td>
+      </tr>
+      <tr>
+        <td class="lbl">ضريبة القيمة المضافة (15%)<small>VAT Amount</small></td>
+        <td class="num">{{ inv.tax_display }}</td>
+      </tr>
+      <tr class="e2-gtotal tpl-gtotal">
+        <td class="lbl">الإجمالي شامل الضريبة<small>Grand Total</small></td>
+        <td class="num">{{ inv.total_display }}</td>
+      </tr>
+      <tr class="e2-paid">
+        <td class="lbl">المبلغ المدفوع<small>Paid Amount</small></td>
+        <td class="num">
+          {% if 'آجل' in inv.payment_type or 'اجل' in inv.payment_type or inv.payment_type == 'Credit' %}
+            0.00
+          {% else %}
+            {{ inv.total_display }}
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ===== التوقيع والختم ===== -->
+  <div class="e2-sign-wrap">
+    <div class="e2-sign">
+      <div class="ln"></div>
+      التوقيع والختم المعتمد
+    </div>
+  </div>
+
+  <!-- ===== رمز التحقق الضريبي QR ===== -->
+  {% if inv.qr_img %}
+  <div style="text-align:center;margin-top:6mm;border-top:1.5px solid #065f46;padding-top:4mm;page-break-inside:avoid;">
+    <img class="inv-qr" src="{{ inv.qr_img }}" style="width:42mm;height:42mm;border:1px solid #065f46;padding:2mm;" alt="رمز التحقق الضريبي — فاتورة {{ inv.number }}">
+    <div style="font-size:10px;color:#065f46;margin-top:1.5mm;letter-spacing:1px;font-weight:700;">{{ inv.qr_note }}</div>
+  </div>
+  {% endif %}
+
+</div>
+
+</body>
+</html>
+

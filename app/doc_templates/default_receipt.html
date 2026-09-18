@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+{% set primary = theme.primary_color or company.color %}
+{% set title_c = theme.title_color or primary %}
+{% set seller_c = theme.seller_name_color or title_c %}
+{% set head_text = theme.header_text_color or '#ffffff' %}
+<title>{{ doc_title }} رقم {{ rc.number }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Cairo', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+    color: #1f2937; background: #f1f5f9; font-size: 13px;
+  }
+  .doc {
+    position: relative; width: 200mm; min-height: 282mm; margin: 6mm auto;
+    background: #fff; padding: 10mm 9mm; overflow: hidden;
+    box-shadow: 0 2px 14px rgba(0,0,0,.14);
+  }
+  .watermark {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 0;
+  }
+  .watermark span {
+    transform: rotate(-32deg); font-size: 88px; font-weight: 800; color: rgba(220,38,38,.10);
+    border: 6px solid rgba(220,38,38,.10); border-radius: 18px; padding: 6px 34px; white-space: nowrap;
+  }
+  .alert-banner {
+    border-radius: 8px; padding: 3mm 4mm; font-weight: 800; font-size: 11.5px;
+    text-align: center; line-height: 1.8; margin-bottom: 4mm;
+  }
+  .doc > *:not(.watermark) { position: relative; z-index: 1; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
+  .seller { display: flex; gap: 5mm; align-items: center; }
+  .seller img.logo { max-width: 26mm; max-height: 26mm; object-fit: contain; }
+  .logo-fallback {
+    width: 22mm; height: 22mm; border-radius: 12px; background: {{ primary }};
+    color: {{ head_text }}; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 800;
+  }
+  .seller h2 { font-size: 17px; font-weight: 800; color: {{ seller_c }}; }
+  .seller p, .party p { line-height: 1.8; color: #4b5563; }
+  .title-box { text-align: left; }
+  .title-box h1 {
+    display: inline-block; background: {{ title_c }}; color: {{ head_text }};
+    font-size: 18px; font-weight: 800; padding: 7px 22px; border-radius: 10px;
+  }
+  .title-box .meta { margin-top: 4mm; text-align: left; line-height: 1.9; }
+  .parties { display: flex; gap: 6mm; margin-top: 7mm; }
+  .party { flex: 1; border: 1.4px solid #e5e7eb; border-radius: 10px; padding: 4mm 5mm; background: #f9fafb; }
+  .party h3 { font-size: 13px; font-weight: 800; color: {{ primary }}; margin-bottom: 1.5mm; }
+  .amount-card {
+    margin: 8mm auto 0; max-width: 150mm; text-align: center;
+    border: 2px solid {{ primary }}; border-radius: 14px; padding: 7mm 6mm;
+    background: #f8fafc;
+  }
+  .amount-card .amt { font-size: 34px; font-weight: 800; color: {{ primary }}; }
+  .amount-card .amt small { font-size: 15px; font-weight: 700; }
+  .amount-card .cur { color: #64748b; font-weight: 700; margin-top: 1mm; }
+  .tafqit {
+    margin-top: 6mm; border: 1.4px dashed {{ primary }}; border-radius: 10px;
+    padding: 3mm 4mm; background: #f0fdfa; font-weight: 700; line-height: 1.9;
+  }
+  .grid { display: flex; gap: 6mm; margin-top: 7mm; }
+  .grid .box { flex: 1; border: 1.4px solid #e5e7eb; border-radius: 10px; padding: 4mm 5mm; background: #fff; }
+  .grid .box b { color: #111827; }
+  .grid .box .k { color: #6b7280; font-size: 11.5px; }
+  .type-badge {
+    display: inline-block; padding: 1.5mm 7mm; border-radius: 99px; font-weight: 800;
+    background: #ecfdf5; color: #047857;
+  }
+  .type-badge.out { background: #fff7ed; color: #c2410c; }
+  .signs { display: flex; gap: 10mm; margin-top: 16mm; }
+  .signs .sig { flex: 1; text-align: center; color: #6b7280; }
+  .signs .sig .line { border-top: 1.6px dotted #9ca3af; margin-top: 14mm; padding-top: 2mm; font-weight: 700; color: #374151; }
+  .foot {
+    position: absolute; bottom: 6mm; right: 9mm; left: 9mm; z-index: 1;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1.4px solid #fecaca; padding-top: 2.5mm; color: #b91c1c; font-weight: 700; font-size: 11px;
+  }
+  .print-btn {
+    position: fixed; top: 12px; left: 12px; z-index: 99;
+    background: #0e7490; color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 20px; font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  @media print {
+    body { background: #fff; }
+    .doc { margin: 0 auto; box-shadow: none; width: auto; min-height: auto; }
+    .print-btn { display: none; }
+  }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+<div class="doc">
+  {% if theme.show_watermark %}<div class="watermark"><span>{{ watermark_text }}</span></div>{% endif %}
+  {% if theme.alert_banner_enabled and theme.alert_banner_text %}
+  <div class="alert-banner" style="color:{{ theme.alert_banner_color }};background:{{ theme.alert_banner_bg }};border:1.5px solid {{ theme.alert_banner_color }}">
+    ⚠ {{ theme.alert_banner_text }}
+  </div>
+  {% endif %}
+  <div class="head tpl-header">
+    <div class="seller tpl-logo-wrap">
+      {% if company.logo_data_uri %}
+        <img class="logo tpl-logo" src="{{ company.logo_data_uri }}" alt="شعار">
+      {% else %}
+        <div class="logo-fallback tpl-logo">{{ company.name[:1] }}</div>
+      {% endif %}
+      <div>
+        <h2 class="tpl-company">{{ company.name }}</h2>
+        <p class="tpl-meta">{{ company.address }}</p>
+        <p class="tpl-meta">الرقم الضريبي: <b>{{ company.tax_number }}</b></p>
+      </div>
+    </div>
+    <div class="title-box">
+      <h1 class="tpl-title">{{ doc_title }}</h1>
+      <div class="meta">
+        <div>رقم السند: <b>{{ rc.number }}</b></div>
+        <div>التاريخ: <b>{{ rc.date_display }}</b> — الوقت: <b>{{ rc.time_display }}</b></div>
+        <div>النوع: <span class="type-badge {{ 'out' if rc.type == 'صرف' }}">{{ rc.type }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="party">
+      <h3>بيانات الجهة</h3>
+      <p><b>{{ company.name }}</b></p>
+      {% if company.address %}<p>{{ company.address }}</p>{% endif %}
+      {% if company.tax_number %}<p>الرقم الضريبي: {{ company.tax_number }}</p>{% endif %}
+    </div>
+    <div class="party tpl-cust">
+      <h3>{{ 'استلمنا من' if rc.type == 'قبض' else 'صرفنا إلى' }}</h3>
+      <p><b>{{ customer.name }}</b></p>
+      {% if customer.address %}<p>{{ customer.address }}</p>{% endif %}
+      {% if customer.tax_number %}<p>الرقم الضريبي: {{ customer.tax_number }}</p>{% endif %}
+      {# السجل التجاري للمشتري: يُعرض فور وجود قيمته ويُخفى تلقائيًا إذا كان فارغًا #}
+      {% if customer.cr_number %}<p>السجل التجاري: {{ customer.cr_number }}</p>{% endif %}
+      {% if customer.phone %}<p>الهاتف: {{ customer.phone }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="amount-card">
+    <div class="amt">{{ rc.amount_display }} <small>ر.س</small></div>
+    <div class="cur">المبلغ {{ 'المستلم' if rc.type == 'قبض' else 'المدفوع' }}</div>
+    <div class="tafqit">💰 المبلغ بالحروف: {{ rc.amount_words }}</div>
+  </div>
+
+  <div class="grid">
+    <div class="box">
+      <div class="k">عن الفاتورة رقم</div>
+      <b>{{ rc.related_invoice or '—' }}</b>
+    </div>
+    <div class="box">
+      <div class="k">طريقة السداد</div>
+      <b>نقدي / تحويل بنكي</b>
+    </div>
+    <div class="box">
+      <div class="k">ملاحظات</div>
+      <b>{{ rc.notes or '—' }}</b>
+    </div>
+  </div>
+
+  <div class="signs">
+    <div class="sig"><div class="line">توقيع المستلم</div></div>
+    <div class="sig"><div class="line">توقيع المحاسب</div></div>
+    <div class="sig"><div class="line">ختم الجهة</div></div>
+  </div>
+
+  <div class="foot tpl-foot">
+    <span>{{ footer_notice }}</span>
+    <span>{{ generated_note }}</span>
+  </div>
+
+</div>
+</body>
+</html>

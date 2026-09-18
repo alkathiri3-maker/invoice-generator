@@ -1,0 +1,393 @@
+{% extends "layout.html" %}
+{% block title %}فاتورة يدوية — {{ APP_NAME }}{% endblock %}
+{% block page_title %}إنشاء فاتورة يدوية{% endblock %}
+{% block actions %}
+<button class="btn green" onclick="saveManual(true)">✅ حفظ واعتماد</button>
+<button class="btn" onclick="saveManual(false)">💾 حفظ كمسودة</button>
+{% endblock %}
+{% block content %}
+<datalist id="itemsList">
+  {% for it in item_rows %}
+  <option value="{{ it.name }}">{{ it.group_name or '' }} — {{ it.unit_price|sar }} ر.س{{ ' — ' + it.unit if it.unit }}</option>
+  {% endfor %}
+</datalist>
+
+<form id="mform" onsubmit="return false">
+  <!-- ═══════ بيانات الفاتورة ═══════ -->
+  <div class="panel mod">
+    <div class="mhead">
+      <span class="mico">🏢</span>
+      <div><span class="mt">بيانات الفاتورة</span><span class="ms">حدد البائع والعميل ورقم الفاتورة والقالب ونوع الباركود (الموضع ثابت أسفل «المبلغ كتابةً»)</span></div>
+    </div>
+    <div class="mbody">
+      <div class="mgrid">
+        <div>
+          <label class="f">الشركة البائعة *</label>
+          <select name="company_id" id="mCompany" required>
+            <option value="">— اختر —</option>
+            {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f">العميل *</label>
+          <select name="customer_id" id="mCustomer" required>
+            <option value="">— اختر —</option>
+            {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="f">رقم الفاتورة <small>(فارغ = تلقائي M1, M2 …)</small></label>
+          <input type="text" name="invoice_number" id="mNumber" placeholder="M1" maxlength="40">
+          <div class="hint" id="mNumHint">يُمنع تكرار الرقم فقط لنفس العميل والشركة معًا — مسموح لعميل مختلف.</div>
+        </div>
+        <div>
+          <label class="f">طريقة السداد</label>
+          <select name="payment_type" id="mPayment">
+            <option>نقدي</option>
+            <option>آجل</option>
+            <option>شبكة</option>
+            <option>تحويل بنكي</option>
+          </select>
+        </div>
+        <div>
+          <label class="f">التاريخ *</label>
+          <input type="date" name="invoice_date" id="mDate" value="{{ today }}">
+        </div>
+        <div>
+          <label class="f">الوقت</label>
+          <input type="time" name="invoice_time" id="mTime" value="{{ now_time }}">
+        </div>
+        <div>
+          <label class="f">قالب الفاتورة</label>
+          <div class="tpl-row">
+            <select name="template_id" id="mTemplate">
+              <option value="">الافتراضي</option>
+              {% for t in invoice_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+            </select>
+            <button class="btn sm" type="button" title="معاينة القالب المختار ببيانات نموذجية"
+                    onclick="previewTemplate()">👁 معاينة</button>
+          </div>
+        </div>
+        <div>
+          <label class="f">نوع الباركود (QR) <small>(الموضع ثابت أسفل «المبلغ كتابةً»)</small></label>
+          <select name="qr_mode" id="mQrMode" onchange="onQrModeChange()">
+            {% for value, label in qr_modes %}
+            <option value="{{ value }}" {{ 'selected' if value == 'none' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="hint" id="mQrHint"></div>
+        </div>
+        <div>
+          <label class="f">خصم على مستوى الفاتورة (ر.س)</label>
+          <input type="number" step="0.01" min="0" name="invoice_discount" id="mInvDisc" value="0" oninput="updateTotals()">
+        </div>
+      </div>
+      <label class="f" style="margin:12px 0 6px">ملاحظات</label>
+      <textarea name="notes" id="mNotes" rows="2" maxlength="500" placeholder="ملاحظات تظهر على الفاتورة (اختياري)"></textarea>
+    </div>
+  </div>
+
+  <!-- ═══════ الأصناف ═══════ -->
+  <div class="panel mod">
+    <div class="mhead">
+      <span class="mico">📦</span>
+      <div><span class="mt">الأصناف</span><span class="ms">اختر المجموعة أولًا ثم الصنف منها — أو اختر «صنف حر» للكتابة الحرة</span></div>
+    </div>
+    <div class="mbody">
+      <!-- مفتاح: هل الأسعار شاملة الضريبة أم تضاف إليها؟ (بنفس آلية نافذة التحرير) -->
+      <div class="tax-toggle">
+        <input type="checkbox" id="mTaxIncl" onchange="updateTotals()">
+        <div>
+          <div class="tt-title">هل جميع خيارات الأصناف شاملة الضريبة أم تُضاف إليها الضريبة؟</div>
+          <div class="tt-note" id="mTaxNote"></div>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table class="tbl mod" id="linesTable">
+          <thead>
+            <tr>
+              <th class="ln-group">المجموعة *</th>
+              <th>الصنف *</th>
+              <th>الوحدة</th>
+              <th>الكمية *</th>
+              <th>سعر الوحدة *</th>
+              <th>الخصم %</th>
+              <th>الضريبة %</th>
+              <th>المبلغ الإجمالي</th>
+              <th>الصافي</th>
+              <th>الضريبة</th>
+              <th>الإجمالي</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="btn sm" type="button" onclick="addLine()">➕ إضافة سطر</button>
+
+      <div class="totals-grid">
+        <div class="tot-card"><div class="tv" id="mtNet">0.00</div><div class="tl">الصافي قبل الضريبة</div></div>
+        <div class="tot-card"><div class="tv" id="mtLineDisc">0.00</div><div class="tl">خصم الأسطر</div></div>
+        <div class="tot-card"><div class="tv" id="mtInvDisc">0.00</div><div class="tl">خصم الفاتورة</div></div>
+        <div class="tot-card"><div class="tv" id="mtTax">0.00</div><div class="tl">ضريبة القيمة المضافة</div></div>
+        <div class="tot-card grand"><div class="tv" id="mtGross">0.00</div><div class="tl">الإجمالي النهائي</div></div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const CATALOG = {{ catalog|tojson }};
+const FREE_KEY = '__free__';
+const d = s => { const v = parseFloat(s); return isNaN(v) ? 0 : v; };
+const fmt2 = h => (h / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function groupOptions() {
+  return Object.keys(CATALOG).map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('')
+       + `<option value="${FREE_KEY}">✏️ صنف حر (كتابة مباشرة)</option>`;
+}
+
+function rowHtml() {
+  return `<tr>
+    <td><select class="ln-group" onchange="onGroupChange(this)"><option value="">— اختر المجموعة —</option>${groupOptions()}</select></td>
+    <td><select class="ln-item" disabled onchange="onItemChange(this)"><option value="">— اختر المجموعة أولًا —</option></select>
+        <input type="text" class="ln-name" list="itemsList" placeholder="اسم الصنف" style="display:none"></td>
+    <td><input type="text" class="ln-unit" placeholder="حبة" title="وحدة الصنف — تُعبأ تلقائيًا من الصنف ويمكن تعديلها" style="width:90px"></td>
+    <td><input type="number" class="ln-qty num-in" min="0" step="any" value="1" oninput="updateTotals()"></td>
+    <td><input type="number" class="ln-price num-in" min="0" step="0.01" value="0" oninput="updateTotals()"></td>
+    <td><input type="number" class="ln-disc num-in" min="0" max="100" step="0.01" value="0" oninput="updateTotals()"></td>
+    <td><input type="number" class="ln-tax num-in" min="0" max="100" step="0.01" value="15" oninput="updateTotals()"></td>
+    <td class="num ln-lineTotal">0.00</td>
+    <td class="num ln-net">0.00</td>
+    <td class="num ln-tax-amt">0.00</td>
+    <td class="num ln-gross">0.00</td>
+    <td><button type="button" class="del-btn" onclick="delLine(this)">🗑</button></td>
+  </tr>`;
+}
+
+function addLine() {
+  document.querySelector('#linesTable tbody').insertAdjacentHTML('beforeend', rowHtml());
+}
+
+function delLine(btn) {
+  btn.closest('tr').remove();
+  if (!document.querySelectorAll('#linesTable tbody tr').length) addLine();
+  updateTotals();
+}
+
+function onGroupChange(sel) {
+  const tr = sel.closest('tr'), itemSel = tr.querySelector('.ln-item'),
+        nameIn = tr.querySelector('.ln-name'), unitIn = tr.querySelector('.ln-unit');
+  if (sel.value === FREE_KEY) {
+    itemSel.style.display = 'none'; itemSel.disabled = true;
+    itemSel.innerHTML = '<option value="">—</option>';
+    unitIn.value = '';                       // وحدة حرة: يكتبها المستخدم بنفسه
+    unitIn.disabled = false;
+    nameIn.style.display = ''; nameIn.focus();
+    return;
+  }
+  nameIn.style.display = 'none'; nameIn.value = '';
+  itemSel.style.display = ''; itemSel.disabled = !sel.value;
+  if (!sel.value) {
+    itemSel.innerHTML = '<option value="">— اختر المجموعة أولًا —</option>';
+    unitIn.value = '';
+    return;
+  }
+  const items = CATALOG[sel.value] || [];
+  itemSel.innerHTML = '<option value="">— اختر الصنف —</option>' + items.map(it =>
+    `<option value="${it.id}" data-name="${esc(it.name)}" data-tax="${it.tax}" data-price="${it.price}" data-unit="${esc(it.unit)}">${esc(it.name)}${it.unit ? ' — ' + esc(it.unit) : ''}</option>`).join('');
+  itemSel.disabled = false;
+  unitIn.value = '';                          // تُعبأ وحدة الصنف عند اختياره
+}
+
+function onItemChange(sel) {
+  const opt = sel.options[sel.selectedIndex], tr = sel.closest('tr');
+  if (!opt || !opt.value) return;
+  tr.querySelector('.ln-qty').value = 1;
+  tr.querySelector('.ln-price').value = d(opt.dataset.price).toFixed(2);
+  tr.querySelector('.ln-tax').value = d(opt.dataset.tax).toFixed(2);
+  // وحدة الصنف ديناميكيًا من قاعدة البيانات (الصنف المختار من مجموعته)
+  tr.querySelector('.ln-unit').value = opt.dataset.unit || '';
+  updateTotals();
+}
+
+function taxInclusive() {
+  return document.getElementById('mTaxIncl').checked;
+}
+
+function updateTotals() {
+  const incl = taxInclusive();
+  document.getElementById('mTaxNote').textContent = incl
+    ? 'الوضع الحالي: الأسعار شاملة الضريبة — الصافي = (الكمية × السعر) ÷ 1.15 والضريبة هي الفرق.'
+    : 'الوضع الحالي: الضريبة تُضاف على السعر — الصافي = الكمية × السعر، والضريبة = الصافي × 15%.';
+  const rows = Array.from(document.querySelectorAll('#linesTable tbody tr'));
+  const items = rows.map(tr => {
+    const qty = d(tr.querySelector('.ln-qty').value),
+          price = d(tr.querySelector('.ln-price').value),
+          disc = Math.min(Math.max(d(tr.querySelector('.ln-disc').value), 0), 100),
+          rate = Math.min(Math.max(d(tr.querySelector('.ln-tax').value), 0), 100) / 100;
+    // المبلغ الإجمالي للصنف = الكمية × سعر الوحدة (بوحدة الهللة)
+    const line = Math.round(price * 100 * qty);
+    // شاملة الضريبة: الصافي = الإجمالي ÷ (1 + النسبة) — غير شاملة: الصافي = الإجمالي
+    const net0 = incl ? Math.round(line / (1 + rate)) : line;
+    const lineDisc = Math.round(net0 * disc / 100);
+    return { line, net0, lineDisc, rate, taxable: Math.max(0, net0 - lineDisc) };
+  });
+  const lineDiscH = items.reduce((a, it) => a + it.lineDisc, 0);
+  const valid = items.filter(it => it.qty > 0 && it.price > 0);
+  let subtotalH = valid.reduce((a, it) => a + it.taxable, 0);
+  let invDiscH = Math.min(Math.round(d(document.getElementById('mInvDisc').value) * 100), subtotalH);
+  if (invDiscH > 0 && subtotalH > 0) {
+    const shares = valid.map(it => Math.round(it.taxable * invDiscH / subtotalH));
+    let diff = invDiscH - shares.reduce((a, b) => a + b, 0);
+    if (diff) {
+      let best = 0, rem = -1;
+      for (let i = 0; i < valid.length; i++) {
+        const r = (valid[i].taxable * invDiscH) % subtotalH;
+        if (r > rem) { rem = r; best = i; }
+      }
+      shares[best] += diff;
+    }
+    valid.forEach((it, i) => { it.taxable = Math.max(0, it.taxable - Math.max(0, shares[i])); });
+  }
+  let taxH = 0, netH = 0;
+  items.forEach((it, i) => {
+    it.tax = Math.round(it.taxable * it.rate);
+    it.gross = it.taxable + it.tax;
+    taxH += it.tax; netH += it.taxable;
+    const tr = rows[i];
+    tr.querySelector('.ln-lineTotal').textContent = fmt2(it.line);
+    tr.querySelector('.ln-net').textContent = fmt2(it.taxable);
+    tr.querySelector('.ln-tax-amt').textContent = fmt2(it.tax);
+    tr.querySelector('.ln-gross').textContent = fmt2(it.gross);
+  });
+  document.getElementById('mtNet').textContent = fmt2(netH);
+  document.getElementById('mtLineDisc').textContent = fmt2(lineDiscH);
+  document.getElementById('mtInvDisc').textContent = fmt2(invDiscH);
+  document.getElementById('mtTax').textContent = fmt2(taxH);
+  document.getElementById('mtGross').textContent = fmt2(netH + taxH);
+}
+
+function previewTemplate() {
+  const id = document.getElementById('mTemplate').value;
+  if (!id) { toast('اختر قالبًا أولًا لمعاينته', true); return; }
+  window.open('/templates/' + id + '/preview', '_blank');
+}
+
+async function saveManual(approve) {
+  const f = document.getElementById('mform');
+  const lines = [];
+  for (const [idx, tr] of Array.from(document.querySelectorAll('#linesTable tbody tr')).entries()) {
+    const groupSel = tr.querySelector('.ln-group'), itemSel = tr.querySelector('.ln-item'),
+          nameIn = tr.querySelector('.ln-name');
+    let item_id = null, item_name = '';
+    if (groupSel.value === FREE_KEY) {
+      item_name = nameIn.value.trim();
+    } else if (groupSel.value) {
+      const opt = itemSel.options[itemSel.selectedIndex];
+      if (!opt || !opt.value) {
+        toast(`اختر الصنف من المجموعة «${groupSel.value}» في السطر ${idx + 1}`, true); return;
+      }
+      item_id = parseInt(opt.value); item_name = opt.dataset.name || opt.textContent;
+    }
+    if (!item_name) continue;   // سطر لم يُستخدم بعد
+    lines.push({
+      item_id,
+      item_name,
+      unit: tr.querySelector('.ln-unit').value.trim(),
+      quantity: d(tr.querySelector('.ln-qty').value),
+      unit_price: d(tr.querySelector('.ln-price').value),
+      discount_rate: d(tr.querySelector('.ln-disc').value),
+      tax_rate: d(tr.querySelector('.ln-tax').value),
+    });
+  }
+  const real = lines.filter(l => l.quantity > 0 && l.unit_price >= 0);
+  if (!real.length) { toast('أضف سطرًا واحدًا على الأقل باسم صنف وكمية وسعر', true); return; }
+  if (!f.company_id.value || !f.customer_id.value) { toast('اختر الشركة البائعة والعميل', true); return; }
+  // حماية من التكرار: يُمنع الحفظ إذا كان الرقم مستخدمًا لنفس العميل والشركة معًا
+  if (f.invoice_number.value.trim()) {
+    await checkNumber();
+    if (_numTaken) { toast('رقم الفاتورة مكرر لنفس العميل والشركة، يرجى اختيار رقم آخر.', true); return; }
+  }
+  const payload = {
+    company_id: parseInt(f.company_id.value),
+    customer_id: parseInt(f.customer_id.value),
+    invoice_number: f.invoice_number.value.trim(),
+    invoice_date: f.invoice_date.value,
+    invoice_time: f.invoice_time.value || '00:00',
+    payment_type: f.payment_type.value,
+    template_id: f.template_id.value ? parseInt(f.template_id.value) : null,
+    qr_mode: f.qr_mode.value || 'none',
+    invoice_discount: d(f.invoice_discount.value),
+    prices_include_tax: taxInclusive(),
+    notes: f.notes.value.trim(),
+    approve,
+    lines: real,
+  };
+  try {
+    const j = await api('/api/admin/manual-invoice', payload);
+    const qrMsg = j.qr_mode === 'phase2' ? ' — باركود المرحلة الثانية'
+                : (j.qr_mode === 'simple' ? ' — باركود المرحلة الأولى' : '');
+    toast(`✅ فاتورة ${j.invoice_number}${qrMsg} — ${j.status === 'approved' ? 'معتمدة' : 'مسودة حفظت بنجاح'} (الإجمالي ${fmt2(Math.round(j.total * 100))} ر.س)`);
+    setTimeout(() => location.href = '/admin/manual-invoices', 900);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ─ نوع الباركود: الموضع ثابت أسفل «المبلغ كتابةً» في كل القوالب ─
+const QR_HINTS = {
+  none: 'لن يظهر أي باركود على الفاتورة.',
+  simple: 'باركود المرحلة الأولى: 5 وسوم (اسم البائع، الرقم الضريبي، الطابع الزمني، الإجمالي، الضريبة). يتطلب رقمًا ضريبيًا صحيحًا للشركة (15 رقمًا يبدأ بـ 3).',
+  phase2: 'باركود المرحلة الثانية (ZATCA TLV 1-9): يُولَّد بحجم وتباين عالٍ أسفل «المبلغ كتابةً» ليكون مقروءًا فورًا بكاميرا الجوال وتطبيقات الفحص. يتطلب رقمًا ضريبيًا صحيحًا للشركة.',
+};
+function onQrModeChange() {
+  const mode = document.getElementById('mQrMode').value;
+  document.getElementById('mQrHint').textContent = QR_HINTS[mode] || '';
+}
+onQrModeChange();
+
+// ─ فحص فوري لتكرار رقم الفاتورة (لنفس العميل والشركة معًا فقط) ─
+let _numTaken = false;
+async function checkNumber() {
+  const f = document.getElementById('mform');
+  const hint = document.getElementById('mNumHint');
+  const num = f.invoice_number.value.trim();
+  if (!num) {
+    _numTaken = false;
+    hint.className = 'hint';
+    hint.textContent = 'يُمنع تكرار الرقم فقط لنفس العميل والشركة معًا — مسموح لعميل مختلف.';
+    return;
+  }
+  try {
+    const q = new URLSearchParams({ number: num });
+    if (f.customer_id.value) q.set('customer_id', f.customer_id.value);
+    if (f.company_id.value) q.set('company_id', f.company_id.value);
+    const j = await api('/api/admin/invoice-number/check?' + q.toString());
+    _numTaken = !j.available;
+    hint.className = 'hint ' + (j.available ? 'ok' : 'warn');
+    hint.textContent = (j.available ? '✅ ' : '⛔ ') + (j.message || '');
+  } catch (e) {
+    // لا يُعطَّل الحفظ إذا تعذّر الفحص — الخادم يتحقق من التكرار عند الحفظ أيضًا
+    _numTaken = false;
+    hint.className = 'hint';
+    hint.textContent = 'تعذّر الفحص الفوري — سيتم التحقق من التكرار عند الحفظ.';
+  }
+}
+['mNumber', 'mCustomer', 'mCompany'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', checkNumber);
+  el.addEventListener('blur', checkNumber);
+});
+document.getElementById('mNumber').addEventListener('input', checkNumber);
+
+addLine();
+updateTotals();
+</script>
+{% endblock %}

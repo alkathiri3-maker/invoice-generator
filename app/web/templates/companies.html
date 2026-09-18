@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block title %}الشركات — {{ APP_NAME }}{% endblock %}
+{% block page_title %}إدارة الشركات (البائعون){% endblock %}
+{% block actions %}<button class="btn" onclick="openAdd()">＋ إضافة شركة</button>{% endblock %}
+{% block content %}
+<div class="panel">
+  {% if rows %}
+  <table class="tbl">
+    <thead>
+      <tr><th>الشعار</th><th>الاسم</th><th>العنوان</th><th>الرقم الضريبي</th><th>السجل التجاري</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}" data-name="{{ r.name }}" data-address="{{ r.address }}"
+          data-tax_number="{{ r.tax_number }}" data-cr_number="{{ r.cr_number }}"
+          data-color="{{ r.color }}" data-logo_path="{{ r.logo_path }}">
+        <td>
+          {% if r.logo_path %}<img src="{{ url_for('pages.uploads', name=r.logo_path) }}" style="width:38px;height:38px;object-fit:contain;border-radius:8px;border:1px solid var(--line)">
+          {% else %}<div style="width:38px;height:38px;border-radius:8px;background:{{ r.color }};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">{{ r.name[:1] }}</div>{% endif %}
+        </td>
+        <td><b>{{ r.name }}</b></td>
+        <td class="muted">{{ r.address }}</td>
+        <td><span class="badge blue">{{ r.tax_number or '—' }}</span></td>
+        <td>{{ r.cr_number or '—' }}</td>
+        <td style="white-space:nowrap">
+          <button class="btn sm ghost" onclick="openEdit(this.closest('tr'))">✏️ تعديل</button>
+          <button class="btn sm red" onclick="deleteRow('companies', {{ r.id }}, 'الشركة')">🗑 حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">لا توجد شركات — أضف أول شركة</div>{% endif %}
+</div>
+
+<dialog id="dlg">
+  <h3 id="dlg-title">إضافة شركة</h3>
+  <form id="frm" onsubmit="return false">
+    <input type="hidden" name="id">
+    <div class="grid2">
+      <div><label class="f">اسم الشركة *</label><input type="text" name="name" required></div>
+      <div><label class="f">اللون الرئيسي</label><input type="color" name="color" value="#0e7490"></div>
+    </div>
+    <label class="f">العنوان</label><input type="text" name="address">
+    <div class="grid2">
+      <div><label class="f">الرقم الضريبي <small>(15 رقمًا يبدأ بـ 3 لرمز QR)</small></label><input type="text" name="tax_number"></div>
+      <div><label class="f">السجل التجاري</label><input type="text" name="cr_number"></div>
+    </div>
+    <label class="f">الشعار <small>(png/jpg)</small></label><input type="file" name="logo" accept="image/*">
+    <div class="check"><input type="checkbox" name="keep_logo" value="1" id="keeplogo"><label for="keeplogo">الاحتفاظ بالشعار الحالي عند التعديل</label></div>
+    <div class="dlg-actions">
+      <button class="btn" type="submit">💾 حفظ</button>
+      <button class="btn ghost" type="button" onclick="closeDlg('dlg')">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+const MAP = [['id','id','number'],['name','name'],['address','address'],
+             ['tax_number','tax_number'],['cr_number','cr_number'],['color','color']];
+function openAdd() {
+  document.getElementById('frm').reset();
+  document.getElementById('dlg-title').textContent = 'إضافة شركة';
+  openDlg('dlg');
+}
+function openEdit(tr) {
+  fillForm('dlg', MAP, tr.dataset);
+  document.getElementById('dlg-title').textContent = 'تعديل شركة';
+}
+document.getElementById('frm').addEventListener('submit', async () => {
+  const idEl = document.querySelector('#frm [name=id]');
+  const isEdit = idEl && idEl.value;
+  try {
+    const j = await api('/api/companies', new FormData(document.getElementById('frm')));
+    const c = (j && j.cascade) || null;
+    if (isEdit && c) toast('✅ تم تحديث الشركة ومزامنتها تلقائيًا في ' + (c.invoices || 0) + ' فاتورة و' + (c.receipts || 0) + ' سند (QR: ' + (c.qr_refreshed || 0) + ')');
+    else toast('تم الحفظ بنجاح');
+    setTimeout(() => location.reload(), 900);
+  } catch (e) { toast(e.message, true); }
+});
+</script>
+{% endblock %}

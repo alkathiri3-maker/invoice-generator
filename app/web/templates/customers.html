@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block title %}العملاء — {{ APP_NAME }}{% endblock %}
+{% block page_title %}إدارة العملاء{% endblock %}
+{% block actions %}<button class="btn" onclick="openAdd()">＋ إضافة عميل</button>{% endblock %}
+{% block content %}
+<div class="panel">
+  {% if rows %}
+  <table class="tbl">
+    <thead><tr><th>الاسم</th><th>العنوان</th><th>الرقم الضريبي</th><th>السجل التجاري</th><th>الهاتف</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}" data-name="{{ r.name }}" data-address="{{ r.address }}"
+          data-tax_number="{{ r.tax_number }}" data-cr_number="{{ r.cr_number }}" data-phone="{{ r.phone }}">
+        <td><b>{{ r.name }}</b></td>
+        <td class="muted">{{ r.address }}</td>
+        <td><span class="badge blue">{{ r.tax_number or 'غير مسجل' }}</span></td>
+        <td>{% if r.cr_number %}<span class="badge amber">{{ r.cr_number }}</span>{% else %}<span class="muted">— لن يظهر في الفاتورة —</span>{% endif %}</td>
+        <td>{{ r.phone or '—' }}</td>
+        <td style="white-space:nowrap">
+          <button class="btn sm ghost" onclick="openEdit(this.closest('tr'))">✏️ تعديل</button>
+          <button class="btn sm red" onclick="deleteRow('customers', {{ r.id }}, 'العميل')">🗑 حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">لا يوجد عملاء — أضف أول عميل</div>{% endif %}
+</div>
+
+<dialog id="dlg">
+  <h3 id="dlg-title">إضافة عميل</h3>
+  <form id="frm" onsubmit="return false">
+    <input type="hidden" name="id">
+    <label class="f">اسم العميل *</label><input type="text" name="name" required>
+    <label class="f">العنوان</label><input type="text" name="address">
+    <div class="grid2">
+      <div><label class="f">الرقم الضريبي</label><input type="text" name="tax_number"></div>
+      <div><label class="f">السجل التجاري <small>(اتركه فارغًا ليُخفى من الفاتورة)</small></label><input type="text" name="cr_number"></div>
+    </div>
+    <label class="f">الهاتف</label><input type="tel" name="phone">
+    <div class="dlg-actions">
+      <button class="btn" type="submit">💾 حفظ</button>
+      <button class="btn ghost" type="button" onclick="closeDlg('dlg')">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+const MAP = [['id','id','number'],['name','name'],['address','address'],
+             ['tax_number','tax_number'],['cr_number','cr_number'],['phone','phone']];
+function openAdd() {
+  document.getElementById('frm').reset();
+  document.getElementById('dlg-title').textContent = 'إضافة عميل';
+  openDlg('dlg');
+}
+function openEdit(tr) {
+  fillForm('dlg', MAP, tr.dataset);
+  document.getElementById('dlg-title').textContent = 'تعديل عميل';
+}
+document.getElementById('frm').addEventListener('submit', async () => {
+  const idEl = document.querySelector('#frm [name=id]');
+  const isEdit = idEl && idEl.value;
+  try {
+    const j = await api('/api/customers', new FormData(document.getElementById('frm')));
+    const c = (j && j.cascade) || null;
+    if (isEdit && c) toast('✅ تم تحديث العميل ومزامنته تلقائيًا في ' + (c.invoices || 0) + ' فاتورة و' + (c.receipts || 0) + ' سند');
+    else toast('تم الحفظ بنجاح');
+    setTimeout(() => location.reload(), 900);
+  } catch (e) { toast(e.message, true); }
+});
+</script>
+{% endblock %}

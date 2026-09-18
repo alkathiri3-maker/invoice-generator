@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+{% block title %}لوحة المشرف — {{ APP_NAME }}{% endblock %}
+{% block page_title %}لوحة المشرف{% endblock %}
+{% block actions %}
+<a class="btn green" href="{{ url_for('pages.manual_invoice_page') }}">✍️ فاتورة يدوية جديدة</a>
+{% if stats.manual_drafts %}
+<a class="btn" href="{{ url_for('pages.manual_invoices_list', status='draft') }}">✅ اعتماد {{ stats.manual_drafts }} مسودة</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+
+<div class="cards">
+  <div class="card"><div class="k">الفواتير الكلية</div><div class="v">{{ stats.invoices }}</div></div>
+  <div class="card green"><div class="k">إجمالي شامل الضريبة</div><div class="v">{{ stats.gross|sar }} ر.س</div></div>
+  <div class="card red"><div class="k">فواتير يدوية بانتظار الاعتماد</div><div class="v">{{ stats.manual_drafts }}</div></div>
+  <div class="card"><div class="k">فواتير يدوية معتمدة</div><div class="v">{{ stats.manual_approved }}</div></div>
+  <div class="card"><div class="k">الشركات / العملاء</div><div class="v">{{ stats.companies }} / {{ stats.customers }}</div></div>
+  <div class="card"><div class="k">الأصناف / المجموعات</div><div class="v">{{ stats.items }} / {{ stats.groups }}</div></div>
+  <div class="card"><div class="k">الدفعات</div><div class="v">{{ stats.batches }}</div></div>
+  <div class="card"><div class="k">السندات</div><div class="v">{{ stats.receipts }}</div></div>
+</div>
+
+<!-- ═══ الأقسام الرئيسية — تنظيم سريع للتنقل ═══ -->
+<div class="admin-cols">
+  <div class="panel">
+    <h2>🧾 الفواتير</h2>
+    <div class="quicklinks">
+      <a href="{{ url_for('pages.manual_invoice_page') }}">✍️ <b>إنشاء فاتورة يدوية</b><small>أصناف وأسعار وكميات وخصومات بحرية</small></a>
+      <a href="{{ url_for('pages.manual_invoices_list') }}">✅ <b>اعتماد الفواتير اليدوية</b><small>{% if stats.manual_drafts %}{{ stats.manual_drafts }} مسودة بانتظار الاعتماد{% else %}لا توجد مسودات حاليًا{% endif %}</small></a>
+      <a href="{{ url_for('pages.generate') }}">⚙️ توليد دفعة فواتير <small>توليد دفعة كاملة عشوائيًا وفق الإعدادات</small></a>
+      <a href="{{ url_for('pages.invoices') }}">📊 الفواتير الناتجة <small>استعراض وتصدير وطباعة الفواتير</small></a>
+      <a href="{{ url_for('pages.receipts') }}">🧾 السندات <small>سندات القبض والصرف المرافقة</small></a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🗂️ البيانات الرئيسية</h2>
+    <div class="quicklinks">
+      <a href="{{ url_for('pages.companies') }}">🏢 الشركات <small>الشركات البائعة وبياناتها الضريبية</small></a>
+      <a href="{{ url_for('pages.customers') }}">👥 العملاء <small>العملاء وبياناتهم</small></a>
+      <a href="{{ url_for('pages.items') }}">📦🗂️ إدارة الأصناف والمجموعات <small>تبويبات المجموعات مع أصنافها — إضافة/تعديل/حذف/استيراد/تصدير</small></a>
+      <a href="{{ url_for('pages.templates_screen') }}">🧾 قوالب المستندات <small>تخصيص قوالب الفواتير والسندات</small></a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🛡️ النظام والأدوات</h2>
+    <div class="quicklinks">
+      <a href="{{ url_for('pages.verify_page') }}">🔎 فحص الباركود <small>التحقق من رموز QR</small></a>
+      <a href="{{ url_for('pages.settings_screen') }}">🛡️ الإعدادات والأمان <small>كلمة التحكم، النسخ الاحتياطية، المظهر</small></a>
+    </div>
+  </div>
+</div>
+<!-- ═══ المسودات الأخيرة ═══ -->
+<div class="panel">
+  <h2>⏳ فواتير يدوية بانتظار الاعتماد</h2>
+  {% if pending %}
+  <table class="tbl">
+    <thead><tr><th>الرقم</th><th>التاريخ</th><th>العميل</th><th>الشركة</th><th class="num">الإجمالي</th><th></th></tr></thead>
+    <tbody>
+      {% for p in pending %}
+      <tr>
+        <td><b>{{ p.invoice_number }}</b></td>
+        <td>{{ p.invoice_date|adate }}</td>
+        <td>{{ p.customer_name }}</td>
+        <td>{{ p.company_name }}</td>
+        <td class="num"><b>{{ p.total_amount|sar }}</b></td>
+        <td style="white-space:nowrap">
+          <a class="btn sm" target="_blank" href="/invoices/{{ p.id }}/preview">👁 معاينة</a>
+          <button class="btn sm green" onclick="approveManual({{ p.id }}, this)">✅ اعتماد</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">لا توجد فواتير يدوية بانتظار الاعتماد — ويمكنك إنشاء واحدة جديدة من «فاتورة يدوية» ✍️</div>
+  {% endif %}
+</div>
+
+<!-- ═══ بوابة الحماية: تغيير كلمة المرور ═══ -->
+<div class="panel">
+  <h2>🔑 كلمة مرور بوابة المشرف</h2>
+  <p class="muted" style="margin-bottom:12px">
+    {% if gate.is_default %}
+    <span class="badge amber">لا تزال كلمة المرور الافتراضية: admin123 — غيّرها لحماية أقسام المشرف</span>
+    {% else %}
+    <span class="badge green">كلمة المرور معيّنة ولم تعد الافتراضية</span>
+    {% endif %}
+  </p>
+  <div class="grid3">
+    <div><label class="f">كلمة المرور الحالية</label><input type="password" id="admCur" autocomplete="current-password"></div>
+    <div><label class="f">كلمة المرور الجديدة <small>(4 أحرف على الأقل)</small></label><input type="password" id="admNew" autocomplete="new-password"></div>
+    <div><label class="f">تأكيد كلمة المرور</label><input type="password" id="admNew2" autocomplete="new-password"></div>
+  </div>
+  <div class="dlg-actions"><button class="btn" onclick="changeAdminPassword()">💾 تغيير كلمة المرور</button></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function approveManual(id, btn) {
+  if (!confirm('اعتماد هذه الفاتورة اليدوية؟')) return;
+  btn.disabled = true; btn.textContent = '⏳ …';
+  try {
+    await api(`/api/admin/manual-invoices/${id}/approve`, {});
+    toast('✅ تم اعتماد الفاتورة اليدوية');
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = '✅ اعتماد'; }
+}
+async function changeAdminPassword() {
+  const cur = document.getElementById('admCur').value;
+  const n1 = document.getElementById('admNew').value;
+  const n2 = document.getElementById('admNew2').value;
+  if (n1 !== n2) { toast('كلمتا المرور الجديدتان غير متطابقتين', true); return; }
+  if (!n1 || n1.length < 4) { toast('كلمة المرور الجديدة قصيرة جدًا (4 أحرف على الأقل)', true); return; }
+  try {
+    await api('/api/admin/password', { current_password: cur, new_password: n1 });
+    toast('✅ تم تغيير كلمة مرور بوابة المشرف');
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { toast(e.message, true); }
+}
+</script>
+{% endblock %}

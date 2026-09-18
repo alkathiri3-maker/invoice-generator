@@ -1,0 +1,381 @@
+{% extends "layout.html" %}
+{% block title %}التقارير — {{ APP_NAME }}{% endblock %}
+{% block page_title %}التقارير{% endblock %}
+{% block actions %}<button class="btn green" onclick="openPrintDlg()">🖨️ طباعة التقرير</button>{% endblock %}
+{% block content %}
+{# روابط ترقيم تحتفظ بكل الفلاتر الحالية #}
+{% macro page_url(p) -%}
+/reports?{% for k, v in request.args.items(multi=True) if k != 'page' and k != 'per_page' %}{{ k }}={{ v|urlencode }}&{% endfor %}page={{ p }}&per_page={{ per_page }}
+{%- endmacro %}
+
+{# ═══ 1) الفلاتر: الشركة (البائع)، اسم البائع، اسم العميل، طريقة الدفع، نطاق التاريخ، رقم الفاتورة ═══ #}
+<form class="panel" method="get" action="/reports">
+  <h2>🔎 تصفية التقرير</h2>
+  <div class="filters">
+    <div>
+      <label class="f">اسم الشركة (البائع)</label>
+      <select name="company_id">
+        <option value="">كل الشركات</option>
+        {% for co in companies %}
+        <option value="{{ co.id }}" {{ 'selected' if f_company|string == co.id|string }}>{{ co.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label class="f">اسم البائع <small>(بحث نصي — البائع هو الشركة)</small></label><input type="text" name="seller" value="{{ f_seller }}" placeholder="مثال: الهلال"></div>
+    <div><label class="f">اسم العميل</label><input type="text" name="customer" value="{{ f_customer }}" placeholder="مثال: الواحة"></div>
+    <div>
+      <label class="f">طريقة الدفع</label>
+      <select name="payment">
+        <option value="">كل الطرق</option>
+        {% for p in payments %}<option value="{{ p }}" {{ 'selected' if f_payment == p }}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div><label class="f">رقم الفاتورة</label><input type="text" name="invoice_number" value="{{ f_number }}" placeholder="رقم الفاتورة أو جزء منه"></div>
+    <div><label class="f">من تاريخ</label><input type="date" name="date_from" value="{{ f_from }}"></div>
+    <div><label class="f">إلى تاريخ</label><input type="date" name="date_to" value="{{ f_to }}"></div>
+    <div style="flex:0"><button class="btn" type="submit">تطبيق</button></div>
+    <div style="flex:0"><a class="btn ghost" href="/reports">إعادة تعيين</a></div>
+  </div>
+</form>
+
+{# ═══ شريط الإجماليات (لكل النتائج المطابقة وليس الصفحة الحالية فقط) ═══ #}
+<div class="summary-strip">
+  📊 النتائج: <b>{{ total_count }}</b> فاتورة{% if pages > 1 %} — صفحة <b>{{ page }}</b> من <b>{{ pages }}</b>{% endif %} —
+  الصافي: <b>{{ totals.net|sar }} ر.س</b> — الخصومات: <b>{{ totals.disc|sar }} ر.س</b> —
+  الضريبة: <b>{{ totals.tax|sar }} ر.س</b> — الإجمالي الشامل: <b>{{ totals.gross|sar }} ر.س</b>
+</div>
+
+{# ═══ 2) جدول التقرير التفصيلي ═══ #}
+<div class="panel">
+  <h2>🧾 تقرير الفواتير التفصيلي</h2>
+  {% if rows %}
+  <div class="rpt-wrap">
+  <table class="tbl">
+    <thead><tr>
+      <th>رقم الفاتورة</th><th>التاريخ</th><th>الوقت</th><th>البائع (الشركة)</th><th>العميل</th><th>طريقة الدفع</th>
+      <th class="num">الصافي</th><th class="num">الخصم</th><th class="num">الضريبة</th><th class="num">الإجمالي</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><b>{{ r.invoice_number }}</b>{% if r.is_manual and r.approval_status == 'draft' %} <span class="badge amber" title="فاتورة يدوية غير معتمدة بعد">مسودة</span>{% endif %}</td>
+        <td>{{ r.invoice_date|adate }}</td>
+        <td class="muted">{{ r.invoice_time[:5] }}</td>
+        <td>{{ r.company_name }}</td>
+        <td>{{ r.customer_name }}</td>
+        <td><span class="badge {{ 'green' if r.payment_type == 'نقدي' else 'blue' if r.payment_type == 'آجل' else 'amber' }}">{{ r.payment_type }}</span></td>
+        <td class="num">{{ r.subtotal|sar }}</td>
+        <td class="num">{{ r.discount_amount|sar }}</td>
+        <td class="num">{{ r.tax_amount|sar }}</td>
+        <td class="num"><b>{{ r.total_amount|sar }}</b></td>
+        <td style="white-space:nowrap"><a class="btn sm ghost" target="_blank" href="/invoices/{{ r.id }}/preview" title="معاينة الفاتورة الأصلية">👁 معاينة</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if pages > 1 %}
+  {% set ns = namespace(prev=0) %}
+  <div class="pager">
+    <span class="pg-info">عرض {{ rows|length }} من {{ total_count }} فاتورة</span>
+    <div class="pg-btns">
+      {% if page > 1 %}<a class="pg nav" href="{{ page_url(page - 1) }}">‹ السابق</a>{% endif %}
+      {% for p in range(1, pages + 1) %}
+        {% if p == 1 or p == pages or (page - 2) <= p <= (page + 2) %}
+          {% if ns.prev and p - ns.prev > 1 %}<span class="pg dots">…</span>{% endif %}
+          {% set ns.prev = p %}
+          {% if p == page %}<span class="pg cur">{{ p }}</span>{% else %}<a class="pg" href="{{ page_url(p) }}">{{ p }}</a>{% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if page < pages %}<a class="pg nav" href="{{ page_url(page + 1) }}">التالي ›</a>{% endif %}
+    </div>
+    <span class="pg-info">صفوف بالصفحة:</span>
+    <select onchange="setPerPage(this.value)">
+      {% for n in [25, 50, 100, 200, 500] %}
+      <option value="{{ n }}" {{ 'selected' if per_page == n }}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% else %}<div class="empty">لا توجد فواتير مطابقة للفلاتر المحددة</div>{% endif %}
+</div>
+
+{# ═══ 3) نافذة خيارات الطباعة: تحديد الأعمدة المطلوب طباعتها + تنسيق A4 ═══ #}
+<dialog id="dlgPrint">
+  <h3>🖨️ خيارات طباعة التقرير</h3>
+  <p class="muted" style="margin-bottom:10px">
+    حدّد الأعمدة والخيارات المطلوبة ثم اضغط «طباعة / حفظ PDF» —
+    يُنسَّق مستند الطباعة تلقائيًا بمقاس A4 (وللحفظ كـ PDF اختر «حفظ بصيغة PDF» من نافذة الطباعة).
+  </p>
+  <div class="pr-box">
+    <b>📋 الأعمدة / البيانات المطلوب طباعتها</b>
+    <div class="cols-grid" id="prCols">
+      {% for key, lbl in [('number','رقم الفاتورة'),('date','التاريخ'),('time','الوقت'),('seller','البائع (الشركة)'),('customer','العميل'),('payment','طريقة الدفع'),('net','الصافي'),('discount','الخصم'),('tax','الضريبة'),('total','الإجمالي')] %}
+      <label><input type="checkbox" class="pc" value="{{ key }}" {{ 'checked' if key != 'time' }}> {{ lbl }}</label>
+      {% endfor %}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn sm ghost" type="button" onclick="setAllCols(true)">تحديد الكل</button>
+      <button class="btn sm ghost" type="button" onclick="setAllCols(false)">إلغاء الكل</button>
+      <button class="btn sm ghost" type="button" onclick="setDefaultCols()">الافتراضي</button>
+    </div>
+    <span class="hint">الافتراضي: رقم الفاتورة، التاريخ، البائع، العميل، طريقة الدفع، الخصم، الإجمالي — كما يتطلب التقرير المعتمد</span>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div><label class="f">نطاق الطباعة</label>
+      <select id="prScope">
+        <option value="all" id="prScopeAll">كل النتائج المطابقة</option>
+        <option value="page" id="prScopePage">الصفحة الحالية فقط</option>
+      </select>
+    </div>
+    <div><label class="f">اتجاه الورقة (A4)</label>
+      <select id="prOrient"><option value="portrait">عمودي</option><option value="landscape">أفقي</option></select>
+    </div>
+    <div><label class="f">ترويسة التقرير</label>
+      <select id="prHeader"><option value="1">مع ترويسة (العنوان + الفلاتر + تاريخ الطباعة)</option><option value="0">بدون ترويسة</option></select>
+    </div>
+    <div><label class="f">صف الإجماليات</label>
+      <select id="prTotals"><option value="1">إظهار إجماليات الأعمدة الرقمية</option><option value="0">بدون صف إجماليات</option></select>
+    </div>
+  </div>
+  <div class="dlg-actions">
+    <button class="btn green" id="prGo" onclick="doPrintReport(this)">🖨️ طباعة / حفظ PDF</button>
+    <button class="btn ghost" type="button" onclick="closeDlg('dlgPrint')">إلغاء</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ═══ أنماط خاصة بوحدة التقارير (لا تؤثر على باقي الشاشات) ═══ */
+.rpt-wrap { overflow-x: auto; }
+#dlgPrint .pr-box {
+  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  border-radius: 12px; padding: 12px 14px; font-size: 13px;
+}
+#dlgPrint .cols-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 10px; margin-top: 8px;
+}
+#dlgPrint .cols-grid label {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-weight: 700; font-size: 12.5px; background: #fff;
+  border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 6px 9px; transition: .15s;
+}
+#dlgPrint .cols-grid label:hover { border-color: var(--primary); }
+#dlgPrint .cols-grid input { accent-color: var(--primary); width: 15px; height: 15px; }
+</style>
+<script>
+// ── بيانات التقرير من الخادم ──
+const RPT_APP = { name: {{ APP_NAME|tojson }}, version: {{ APP_VERSION|tojson }} };
+const RPT_TOTAL_COUNT = {{ total_count }};
+const RPT_FILTERS = {{ filter_desc|tojson }};          // [[وصف, قيمة], ...]
+const RPT_PAGE_ROWS = {{ rows|tojson }};               // صفوف الصفحة الحالية
+
+// ── تعريف أعمدة التقرير (مفتاح، حقل في البيانات، رقمي؟) ──
+const RPT_COLUMNS = [
+  { key: 'number',   label: 'رقم الفاتورة',     field: 'invoice_number' },
+  { key: 'date',     label: 'التاريخ',          field: 'invoice_date' },
+  { key: 'time',     label: 'الوقت',            field: 'invoice_time' },
+  { key: 'seller',   label: 'البائع (الشركة)',  field: 'company_name' },
+  { key: 'customer', label: 'العميل',           field: 'customer_name' },
+  { key: 'payment',  label: 'طريقة الدفع',      field: 'payment_type' },
+  { key: 'net',      label: 'الصافي',           field: 'subtotal',        num: true },
+  { key: 'discount', label: 'الخصم',            field: 'discount_amount', num: true },
+  { key: 'tax',      label: 'الضريبة',          field: 'tax_amount',      num: true },
+  { key: 'total',    label: 'الإجمالي',         field: 'total_amount',    num: true },
+];
+const RPT_DEFAULT_COLS = ['number', 'date', 'seller', 'customer', 'payment', 'discount', 'total'];
+
+// ── أدوات تنسيق (مطابقة لمرشحات الخادم sar/adate) ──
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function fmtMoney(v) {
+  return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(s) {
+  s = String(s || '');
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const p = s.slice(0, 10).split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  return s || '—';
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// ── ترقيم الصفحات: الحفاظ على الفلاتر ──
+function setPerPage(v) {
+  const p = new URLSearchParams(location.search);
+  p.set('per_page', v);
+  p.delete('page');
+  location.href = '/reports?' + p.toString();
+}
+
+// ── تحديد أعمدة الطباعة ──
+function setAllCols(on) {
+  document.querySelectorAll('#prCols input.pc').forEach(cb => { cb.checked = on; });
+}
+function setDefaultCols() {
+  document.querySelectorAll('#prCols input.pc').forEach(cb => {
+    cb.checked = RPT_DEFAULT_COLS.includes(cb.value);
+  });
+}
+function selectedCols() {
+  const sel = Array.from(document.querySelectorAll('#prCols input.pc:checked')).map(i => i.value);
+  return RPT_COLUMNS.filter(c => sel.includes(c.key));
+}
+
+// ── فتح نافذة الطباعة مع تحديث أعداد النطاق ──
+function openPrintDlg() {
+  document.getElementById('prScopeAll').textContent = `كل النتائج المطابقة (${RPT_TOTAL_COUNT} فاتورة)`;
+  document.getElementById('prScopePage').textContent = `الصفحة الحالية فقط (${RPT_PAGE_ROWS.length} فاتورة)`;
+  openDlg('dlgPrint');
+}
+// ── بناء مستند الطباعة (A4) — مستند مستقل منسّق للطباعة/PDF ──
+function buildPrintHTML(rows, cols, opts) {
+  const numCols = cols.filter(c => c.num);
+  const totals = {};
+  numCols.forEach(c => {
+    totals[c.key] = rows.reduce((s, r) => s + (Number(r[c.field]) || 0), 0);
+  });
+
+  const cell = (r, c) => {
+    if (c.key === 'date') return escHtml(fmtDate(r[c.field]));
+    if (c.key === 'time') return escHtml(String(r[c.field] || '').slice(0, 5) || '—');
+    if (c.num) return fmtMoney(r[c.field]);
+    return escHtml(r[c.field] || '—');
+  };
+  const head = cols.map(c => `<th${c.num ? ' class="num"' : ''}>${escHtml(c.label)}</th>`).join('');
+  const body = rows.map(r =>
+    `<tr>${cols.map(c => `<td${c.num ? ' class="num"' : ''}>${cell(r, c)}</td>`).join('')}</tr>`).join('');
+
+  // صف الإجماليات: خانة تمتد على الأعمدة غير الرقمية ثم مجموع كل عمود رقمي
+  const nonNum = cols.length - numCols.length;
+  let foot = '';
+  if (opts.withTotals && numCols.length) {
+    const labelCell = nonNum > 0
+      ? `<td colspan="${nonNum}">الإجمالي — عدد الفواتير: ${rows.length}</td>` : '';
+    foot = `<tfoot><tr>${labelCell}${numCols.map(c =>
+      `<td class="num">${fmtMoney(totals[c.key])}</td>`).join('')}</tr></tfoot>`;
+  }
+
+  const chips = RPT_FILTERS.length
+    ? RPT_FILTERS.map(f => `<span>${escHtml(f[0])}: ${escHtml(f[1])}</span>`).join('')
+    : '<span>جميع الفواتير (بدون تصفية)</span>';
+
+  const now = new Date();
+  const printDate = `${pad2(now.getDate())}/${pad2(now.getMonth() + 1)}/${now.getFullYear()} — ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const header = opts.withHeader ? `
+<div class="rp-head">
+  <h1>📋 تقرير الفواتير التفصيلي</h1>
+  <div class="sub">${escHtml(RPT_APP.name)} — نسخة تدريبية v${escHtml(RPT_APP.version)}</div>
+</div>
+<div class="rp-chips">${chips}</div>
+<div class="rp-meta">
+  <span>عدد الفواتير: <b>${rows.length}</b></span>
+  <span>تاريخ الطباعة: ${printDate}</span>
+  <span>العملة: ريال سعودي (SAR)</span>
+</div>` : '';
+
+  return buildPrintShell(opts, { head, body, foot, header });
+}
+function buildPrintShell(opts, parts) {
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>تقرير الفواتير التفصيلي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 ${opts.orient}; margin: 11mm 10mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Cairo','Segoe UI',Tahoma,sans-serif; color: #1f2937; direction: rtl; font-size: 11.5px; }
+.rp-head { text-align: center; margin-bottom: 6px; }
+.rp-head h1 { font-size: 17px; font-weight: 800; color: #155e75; }
+.rp-head .sub { font-size: 10.5px; color: #6b7280; font-weight: 700; margin-top: 2px; }
+.rp-meta {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  font-size: 10.5px; font-weight: 700; color: #334155; background: #f8fafc;
+  border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px; margin: 8px 0;
+}
+.rp-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.rp-chips span {
+  background: #ecfeff; border: 1px solid #a5f3fc; color: #155e75;
+  border-radius: 99px; padding: 2px 10px; font-size: 10px; font-weight: 800;
+}
+table.rp { width: 100%; border-collapse: collapse; }
+table.rp th {
+  background: #ecfeff; color: #155e75; border: 1px solid #94a3b8;
+  padding: 5px 6px; font-size: 10.5px; font-weight: 800; white-space: nowrap;
+}
+table.rp td { border: 1px solid #cbd5e1; padding: 4px 6px; font-size: 10.5px; }
+table.rp thead { display: table-header-group; }   /* تكرار الترويسة أعلى كل صفحة */
+table.rp tr { page-break-inside: avoid; }
+table.rp td.num, table.rp th.num { text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.rp tfoot td { background: #f1f5f9; font-weight: 800; border-top: 1.5px solid #94a3b8; }
+.rp-foot {
+  margin-top: 10px; text-align: center; font-size: 9.5px; color: #b91c1c;
+  font-weight: 800; border-top: 1px dashed #fca5a5; padding-top: 5px;
+}
+</style>
+</head>
+<body>
+${parts.header}
+<table class="rp">
+  <thead><tr>${parts.head}</tr></thead>
+  <tbody>${parts.body}</tbody>
+  ${parts.foot}
+</table>
+<div class="rp-foot">⚠ جميع المخرجات تدريبية — غير صالحة للاستخدام الرسمي</div>
+</body>
+</html>`;
+}
+
+// ── الطباعة عبر iframe مخفي (يبقي شاشة التطبيق كما هي تمامًا) ──
+function printDoc(rows, cols, opts) {
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position:fixed;inset:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(frame);
+  const doc = frame.contentWindow.document;
+  doc.open();
+  doc.write(buildPrintHTML(rows, cols, opts));
+  doc.close();
+  const win = frame.contentWindow;
+  const cleanup = () => setTimeout(() => frame.remove(), 1500);
+  setTimeout(() => { win.focus(); win.print(); cleanup(); }, 300);
+}
+
+// ── جلب صفوف نطاق الطباعة (كل النتائج من الخادم أو الصفحة الحالية) ──
+async function getPrintRows(scope) {
+  if (scope === 'page') return RPT_PAGE_ROWS;
+  const res = await fetch('/reports/data?' + new URLSearchParams(location.search).toString());
+  const json = await res.json();
+  if (!res.ok || json.ok === false) throw new Error(json.error || ('خطأ ' + res.status));
+  if (json.truncated) toast('⚠ عدد النتائج كبير — طُبعت أول ' + json.rows.length + ' فاتورة فقط', true);
+  return json.rows;
+}
+
+// ── التنفيذ: تجميع الخيارات ثم الطباعة ──
+async function doPrintReport(btn) {
+  const cols = selectedCols();
+  if (!cols.length) { toast('اختر عمودًا واحدًا على الأقل للطباعة', true); return; }
+  const opts = {
+    orient: document.getElementById('prOrient').value,
+    withHeader: document.getElementById('prHeader').value === '1',
+    withTotals: document.getElementById('prTotals').value === '1',
+  };
+  const scope = document.getElementById('prScope').value;
+  if (btn) btn.disabled = true;
+  try {
+    const rows = await getPrintRows(scope);
+    if (!rows || !rows.length) { toast('لا توجد نتائج للطباعة', true); return; }
+    closeDlg('dlgPrint');
+    printDoc(rows, cols, opts);
+  } catch (e) { toast(e.message, true); }
+  finally { if (btn) btn.disabled = false; }
+}
+</script>
+{% endblock %}

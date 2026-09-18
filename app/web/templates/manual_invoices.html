@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+{% block title %}اعتماد الفواتير اليدوية — {{ APP_NAME }}{% endblock %}
+{% block page_title %}اعتماد الفواتير اليدوية{% endblock %}
+{% block actions %}
+<a class="btn green" href="{{ url_for('pages.manual_invoice_page') }}">✍️ فاتورة يدوية جديدة</a>
+{% endblock %}
+{% block content %}
+<form class="panel" method="get" action="/admin/manual-invoices">
+  <h2>🔎 تصفية</h2>
+  <div class="filters">
+    <div>
+      <label class="f">الحالة</label>
+      <select name="status" onchange="this.form.submit()">
+        <option value="">الكل ({{ draft_total + approved_total }})</option>
+        <option value="draft" {{ 'selected' if f_status == 'draft' }}>⏳ مسودة ({{ draft_total }})</option>
+        <option value="approved" {{ 'selected' if f_status == 'approved' }}>✅ معتمدة ({{ approved_total }})</option>
+      </select>
+    </div>
+    <div style="flex:0"><span class="hint">الفواتير اليدوية تُحفظ «مسودة» ثم تُعتمد هنا — والأصل أن تُعتمد قبل استخدامها.</span></div>
+  </div>
+</form>
+
+<div class="stat-cards">
+  <div class="stat-card"><span class="sic blue">📋</span><div><div class="sv">{{ rows|length }}</div><div class="sl">الفواتير المعروضة</div></div></div>
+  <div class="stat-card"><span class="sic amber">⏳</span><div><div class="sv">{{ draft_total }}</div><div class="sl">مسودات بانتظار الاعتماد</div></div></div>
+  <div class="stat-card"><span class="sic green">✅</span><div><div class="sv">{{ approved_total }}</div><div class="sl">فواتير معتمدة</div></div></div>
+</div>
+
+<div class="panel">
+  <h2>🧾 الفواتير اليدوية</h2>
+  {% if rows %}
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>الرقم</th><th>التاريخ</th><th>العميل</th><th>الشركة</th><th>الحالة</th>
+        <th class="num">الصافي</th><th class="num">الخصم</th><th class="num">الضريبة</th><th class="num">الإجمالي</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}">
+        <td><b>{{ r.invoice_number }}</b></td>
+        <td>{{ r.invoice_date|adate }}</td>
+        <td>{{ r.customer_name }}</td>
+        <td>{{ r.company_name }}</td>
+        <td>
+          {% if r.approval_status == 'draft' %}
+          <span class="badge amber">⏳ مسودة</span>
+          {% else %}
+          <span class="badge green">✅ معتمدة</span>
+          {% endif %}
+        </td>
+        <td class="num">{{ r.subtotal|sar }}</td>
+        <td class="num">{{ r.discount_amount|sar }}</td>
+        <td class="num">{{ r.tax_amount|sar }}</td>
+        <td class="num"><b>{{ r.total_amount|sar }}</b></td>
+        <td style="white-space:nowrap">
+          <a class="btn sm" target="_blank" href="/invoices/{{ r.id }}/preview">👁 معاينة</a>
+          {% if r.approval_status == 'draft' %}
+          <button class="btn sm green" onclick="approveManual({{ r.id }}, this)">✅ اعتماد</button>
+          {% endif %}
+          <button class="btn sm ghost" onclick="exportOne({{ r.id }}, this)">📄 PDF</button>
+          <button class="btn sm red" onclick="deleteRow('invoices', {{ r.id }}, 'الفاتورة اليدوية')">🗑 حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">لا توجد فواتير يدوية {{ 'في هذه الحالة' if f_status else '' }} — أنشئ واحدة من «فاتورة يدوية» ✍️</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function approveManual(id, btn) {
+  if (!confirm('اعتماد هذه الفاتورة اليدوية؟ بعد الاعتماد تُعد فاتورة نهائية.')) return;
+  btn.disabled = true; btn.textContent = '⏳ …';
+  try {
+    await api(`/api/admin/manual-invoices/${id}/approve`, {});
+    toast('✅ تم اعتماد الفاتورة اليدوية');
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = '✅ اعتماد'; }
+}
+async function exportOne(id, btn) {
+  btn.disabled = true;
+  try {
+    const j = await api('/api/export', { ids: [id], kind: 'invoice', mode: 'combined' });
+    toast('📄 جارٍ تنزيل الفاتورة PDF…');
+    setTimeout(() => location.href = '/exports/' + encodeURIComponent(j.file), 600);
+  } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,174 @@
+{% extends "layout.html" %}
+{% block title %}المجموعات — {{ APP_NAME }}{% endblock %}
+{% block page_title %}مجموعات الأصناف{% endblock %}
+{% block actions %}
+<button class="btn" onclick="expandAll()">عرض كل الأصناف</button>
+<button class="btn ghost" onclick="collapseAll()">إغلاق الكل</button><button class="btn" onclick="openAdd()">＋ إضافة مجموعة</button>{% endblock %}
+{% block content %}
+<div class="summary-strip">اضغط على أي <b>مجموعة</b> لتُعرض <b>أصنافها فقط</b> داخل نفس الصفحة (الاسم، الكود، الوحدة، السعر، الضريبة) — وكل البيانات تُقرأ من قاعدة البيانات مباشرة.</div>
+<div class="panel">
+  <div class="filters">
+    <div>
+      <label class="f">تصفية المجموعات والأصناف</label>
+      <input type="text" id="grpFilter" placeholder="اكتب اسم مجموعة أو صنف أو كود…" oninput="applyFilter(this.value)">
+    </div>
+    <div style="flex:0"><span class="hint" id="grpFilterNote"></span></div>
+  </div>
+</div>
+<div class="panel">
+  {% if rows %}
+  <table class="tbl">
+    <thead><tr><th>المجموعة</th><th>الوصف</th><th>عدد الأصناف</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}" data-name="{{ r.name }}" data-description="{{ r.description }}" class="grp-row" onclick="toggleGroup(this, event)">
+        <td><b>{{ r.name }}</b></td>
+        <td class="muted">{{ r.description }}</td>
+        <td><span class="badge green">{{ r.items_count }}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn sm" type="button" onclick="toggleGroup(this.closest('tr'), event)">عرض الأصناف</button>
+          <button class="btn sm ghost" onclick="openEdit(this.closest('tr'), event)">✏️ تعديل</button>
+          <button class="btn sm red" onclick="deleteRow('groups', {{ r.id }}, 'المجموعة')">🗑 حذف</button>
+        </td>
+      </tr>
+      <tr class="grp-items-row" data-group-id="{{ r.id }}">
+        <td colspan="4">
+          <div class="grp-items-box">
+            <div class="gib-head">أصناف مجموعة «{{ r.name }}» <span class="badge blue">{{ r.items_count }}</span>
+              <span class="muted">— الأصناف التابعة لهذه المجموعة فقط</span></div>
+            <div class="tbl-wrap">
+              <table class="tbl mod gib-tbl">
+                <thead><tr><th>الصنف</th><th>الكود</th><th>الوحدة</th><th class="num">سعر الوحدة (صافي)</th><th>الضريبة</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">لا توجد مجموعات</div>{% endif %}
+</div>
+
+<dialog id="dlg">
+  <h3 id="dlg-title">إضافة مجموعة</h3>
+  <form id="frm" onsubmit="return false">
+    <input type="hidden" name="id">
+    <label class="f">اسم المجموعة *</label><input type="text" name="name" required>
+    <label class="f">الوصف</label><input type="text" name="description">
+    <div class="dlg-actions">
+      <button class="btn" type="submit">💾 حفظ</button>
+      <button class="btn ghost" type="button" onclick="closeDlg('dlg')">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+// ── كتالوج المجموعات وأصنافها من قاعدة البيانات (يُبنى في الخادم) ──
+const CATALOG = {{ catalog|tojson }};
+const BY_ID = {};
+CATALOG.forEach(g => { BY_ID[String(g.id)] = g; });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function itemsRowsHtml(items) {
+  if (!items.length) {
+    return '<tr><td colspan="5" class="muted">لا توجد أصناف في هذه المجموعة — أضفها من شاشة «الأصناف»</td></tr>';
+  }
+  return items.map(it => `<tr>
+        <td><b>${esc(it.name)}</b></td>
+        <td>${esc(it.code) || '—'}</td>
+        <td>${esc(it.unit) || 'حبة'}</td>
+        <td class="num">${money(it.unit_price)}</td>
+        <td><span class="badge amber">${Math.round((Number(it.tax_rate) || 0) * 100)}%</span></td>
+      </tr>`).join('');
+}
+
+// تعبئة الأصناف (التابعة لهذه المجموعة فقط) داخل نفس الصفحة
+function fillItems(tr, items) {
+  const itemsRow = tr.nextElementSibling;
+  if (!itemsRow || !itemsRow.classList.contains('grp-items-row')) return null;
+  const gid = String(itemsRow.dataset.groupId);
+  const list = items || ((BY_ID[gid] && BY_ID[gid].items) || []);
+  itemsRow.querySelector('.gib-tbl tbody').innerHTML = itemsRowsHtml(list);
+  return itemsRow;
+}
+
+function toggleGroup(tr, ev) {
+  if (ev) ev.stopPropagation();
+  const itemsRow = fillItems(tr);
+  if (!itemsRow) return;
+  const open = itemsRow.classList.toggle('open');
+  const btn = tr.querySelector('td:last-child button');
+  if (btn) btn.textContent = open ? 'إخفاء الأصناف' : 'عرض الأصناف';
+}
+
+function expandAll() {
+  let n = 0;
+  document.querySelectorAll('tr.grp-row').forEach(tr => {
+    const itemsRow = fillItems(tr);
+    if (!itemsRow) return;
+    itemsRow.classList.add('open');
+    const btn = tr.querySelector('td:last-child button');
+    if (btn) btn.textContent = 'إخفاء الأصناف';
+    n += 1;
+  });
+  toast(`تم عرض أصناف ${n} مجموعة`);
+}
+
+function collapseAll() {
+  document.querySelectorAll('tr.grp-items-row').forEach(r => r.classList.remove('open'));
+  document.querySelectorAll('tr.grp-row td:last-child button').forEach(b => b.textContent = 'عرض الأصناف');
+}
+
+// ── تصفية المجموعات والأصناف معًا (تصفح سريع) ──
+function applyFilter(term) {
+  const q = (term || '').trim().toLowerCase();
+  let groupsShown = 0, itemsShown = 0;
+  document.querySelectorAll('tr.grp-row').forEach(tr => {
+    const gid = String(tr.dataset.id);
+    const items = (BY_ID[gid] && BY_ID[gid].items) || [];
+    const groupHit = !q || (tr.dataset.name || '').toLowerCase().includes(q)
+                     || (tr.dataset.description || '').toLowerCase().includes(q);
+    const matching = !q ? items : items.filter(it =>
+      String(it.name || '').toLowerCase().includes(q) ||
+      String(it.code || '').toLowerCase().includes(q) ||
+      String(it.unit || '').toLowerCase().includes(q));
+    const visible = groupHit || matching.length > 0;
+    tr.style.display = visible ? '' : 'none';
+    const itemsRow = visible ? fillItems(tr, (q && !groupHit) ? matching : (q ? items : null)) : tr.nextElementSibling;
+    if (itemsRow && itemsRow.classList.contains('grp-items-row')) {
+      itemsRow.style.display = visible ? '' : 'none';
+      if (q && visible) {
+        itemsRow.classList.add('open');
+        const btn = tr.querySelector('td:last-child button');
+        if (btn) btn.textContent = 'إخفاء الأصناف';
+      }
+    }
+    if (visible) {
+      groupsShown += 1;
+      itemsShown += (q && !groupHit) ? matching.length : items.length;
+    }
+  });
+  document.getElementById('grpFilterNote').textContent = q
+    ? `النتيجة: ${groupsShown} مجموعة / ${itemsShown} صنف مطابق`
+    : '';
+}
+
+const MAP = [['id','id','number'],['name','name'],['description','description']];
+function openAdd() {
+  document.getElementById('frm').reset();
+  document.getElementById('dlg-title').textContent = 'إضافة مجموعة';
+  openDlg('dlg');
+}
+function openEdit(tr, ev) {
+  if (ev) ev.stopPropagation();
+  fillForm('dlg', MAP, tr.dataset);
+  document.getElementById('dlg-title').textContent = 'تعديل مجموعة';
+}
+document.getElementById('frm').addEventListener('submit', () => submitModal(document.getElementById('frm'), '/api/groups'));
+</script>
+{% endblock %}

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>فاتورة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+  @media print {
+    /* ضمان طباعة الألوان والخلفيات (ومنع اختفاء الباركود) في كل المتصفحات */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff !important; margin: 0 !important; }
+    .doc-root { margin: 0 auto !important; box-shadow: none !important; }
+    /* الباركود الضريبي أسفل المبلغ كتابة — 54مم سهل المسح بكاميرا الجوال حتى بالمرحلة الثانية (85×85 وحدة) */
+    .inv-qr {
+      display: block !important; margin: 0 auto; visibility: visible !important; opacity: 1 !important;
+      width: 54mm !important; height: 54mm !important;
+      background: #fff !important;
+      page-break-inside: avoid; break-inside: avoid;
+    }
+  }
+</style>
+</head>
+<body style="font-family:'Cairo',sans-serif;color:#0f172a;background:#f8fafc;">
+<div class="doc-root" style="width:200mm;min-height:282mm;margin:6mm auto;background:#fff;padding:0;box-shadow:0 4px 20px rgba(0,0,0,.06);">
+  <div style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#fff;padding:8mm 9mm;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      {% if company.logo_data_uri %}<img src="{{ company.logo_data_uri }}" style="max-width:24mm;max-height:24mm;background:#fff;padding:2mm;border-radius:8px;">{% endif %}
+      <div style="font-size:20px;font-weight:900;margin-top:2mm;">{{ company.name }}</div>
+      <div style="font-size:11px;opacity:.7;margin-top:1mm;">{{ company.address }}</div>
+    </div>
+    <div style="text-align:left;">
+      <div style="font-size:32px;font-weight:900;letter-spacing:-1px;">فاتورة</div>
+      <div style="font-size:13px;opacity:.7;">INVOICE</div>
+      <div style="background:#f59e0b;color:#0f172a;padding:1.5mm 4mm;border-radius:6px;font-weight:bold;font-size:13px;margin-top:2mm;display:inline-block;">#{{ inv.number }}</div>
+    </div>
+  </div>
+  <div style="background:#0f172a;height:2px;"></div>
+  <div style="padding:7mm 9mm;display:grid;grid-template-columns:1fr 1fr;gap:6mm;">
+    <div>
+      <div style="font-size:10px;color:#64748b;letter-spacing:2px;font-weight:bold;">FROM / من</div>
+      <div style="font-size:14px;font-weight:800;margin-top:1mm;">{{ company.name }}</div>
+      <div style="font-size:11px;color:#475569;line-height:1.7;">{{ company.address }}<br>الرقم الضريبي: {{ company.tax_number }}{% if company.cr_number %}<br>س.ت: {{ company.cr_number }}{% endif %}</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#64748b;letter-spacing:2px;font-weight:bold;">BILL TO / إلى</div>
+      <div style="font-size:14px;font-weight:800;margin-top:1mm;">{{ customer.name }}</div>
+      <div style="font-size:11px;color:#475569;line-height:1.7;">{{ customer.address }}{% if customer.tax_number %}<br>الرقم الضريبي: {{ customer.tax_number }}{% endif %}{% if customer.cr_number %}<br>السجل التجاري: {{ customer.cr_number }}{% endif %}{% if customer.phone %}<br>جوال: {{ customer.phone }}{% endif %}</div>
+    </div>
+  </div>
+  <div style="margin:0 9mm;display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;">
+    <div style="background:#f1f5f9;padding:2.5mm 3mm;border-radius:6px;">
+      <div style="font-size:9.5px;color:#64748b;letter-spacing:1px;">التاريخ</div>
+      <div style="font-weight:800;font-size:13px;">{{ inv.date_display }}</div>
+    </div>
+    <div style="background:#f1f5f9;padding:2.5mm 3mm;border-radius:6px;">
+      <div style="font-size:9.5px;color:#64748b;letter-spacing:1px;">الوقت</div>
+      <div style="font-weight:800;font-size:13px;">{{ inv.time_display }}</div>
+    </div>
+    <div style="background:#f1f5f9;padding:2.5mm 3mm;border-radius:6px;">
+      <div style="font-size:9.5px;color:#64748b;letter-spacing:1px;">الدفع</div>
+      <div style="font-weight:800;font-size:13px;">{{ inv.payment_type }}</div>
+    </div>
+    <div style="background:#f1f5f9;padding:2.5mm 3mm;border-radius:6px;">
+      <div style="font-size:9.5px;color:#64748b;letter-spacing:1px;">رقم الفاتورة</div>
+      <div style="font-weight:800;font-size:13px;">{{ inv.number }}</div>
+    </div>
+  </div>
+  <table style="width:calc(100% - 18mm);margin:6mm 9mm 0;border-collapse:collapse;font-size:11.5px;">
+    <thead>
+      <tr style="background:#0f172a;color:#fff;">
+        <th style="padding:3mm 1.5mm;width:8mm;">#</th>
+        <th style="padding:3mm 1.5mm;text-align:right;">الصنف</th>
+        <th style="padding:3mm 1.5mm;width:14mm;">الوحدة</th>
+        <th style="padding:3mm 1.5mm;width:14mm;">الكمية</th>
+        <th style="padding:3mm 1.5mm;width:20mm;">سعر الوحدة</th>
+        <th style="padding:3mm 1.5mm;width:20mm;">الصافي</th>
+        <th style="padding:3mm 1.5mm;width:18mm;">الضريبة 15%</th>
+        <th style="padding:3mm 1.5mm;width:22mm;">الإجمالي</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ln in inv.lines %}
+      <tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:2.5mm 1.5mm;text-align:center;color:#64748b;">{{ loop.index }}</td>
+        <td style="padding:2.5mm 1.5mm;text-align:right;font-weight:600;">{{ ln.name }}</td>
+        <td style="padding:2.5mm 1.5mm;text-align:center;">{{ ln.unit }}</td>
+        <td style="padding:2.5mm 1.5mm;text-align:center;">{{ ln.quantity_display }}</td>
+        <td style="padding:2.5mm 1.5mm;">{{ ln.unit_price_display }}</td>
+        <td style="padding:2.5mm 1.5mm;">{{ ln.line_net_display }}</td>
+        <td style="padding:2.5mm 1.5mm;color:#f59e0b;">{{ ln.line_tax_display }}</td>
+        <td style="padding:2.5mm 1.5mm;font-weight:bold;">{{ ln.line_gross_display }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="display:flex;justify-content:space-between;margin:6mm 9mm 0;gap:6mm;">
+    <div style="flex:1.4;font-size:11.5px;">
+      <div style="background:#fef3c7;border-right:4px solid #f59e0b;padding:3mm 4mm;line-height:1.8;color:#78350f;">💰 {{ inv.total_words }}</div>
+      {% if inv.qr_img %}<div style="margin-top:3mm;"><img class="inv-qr" src="{{ inv.qr_img }}" style="width:54mm;height:54mm;" alt="رمز التحقق الضريبي — فاتورة {{ inv.number }}"></div>{% endif %}
+    </div>
+    <div style="flex:1;">
+      <div style="display:flex;justify-content:space-between;padding:2.5mm 0;border-bottom:1px solid #e2e8f0;"><span style="color:#64748b;">الصافي</span><b>{{ inv.subtotal_display }} ر.س</b></div>
+      <div style="display:flex;justify-content:space-between;padding:2.5mm 0;border-bottom:1px solid #e2e8f0;"><span style="color:#64748b;">الضريبة 15%</span><b>{{ inv.tax_display }} ر.س</b></div>
+      <div style="display:flex;justify-content:space-between;padding:4mm 0;background:#0f172a;color:#fff;margin-top:2mm;padding:4mm;border-radius:8px;">
+        <span style="font-weight:900;font-size:14px;">الإجمالي</span>
+        <span style="font-weight:900;font-size:18px;color:#f59e0b;">{{ inv.total_display }} ر.س</span>
+      </div>
+    </div>
+  </div>
+  <div style="background:#0f172a;color:#94a3b8;padding:4mm 9mm;margin-top:8mm;font-size:10.5px;text-align:center;">شكرًا لتعاملكم معنا — Thank you for your business</div>
+</div>
+</body>
+</html>

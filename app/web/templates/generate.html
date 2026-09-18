@@ -1,0 +1,209 @@
+{% extends "layout.html" %}
+{% block title %}توليد الفواتير — {{ APP_NAME }}{% endblock %}
+{% block page_title %}إعدادات التوليد{% endblock %}
+{% block actions %}
+<button class="btn green" id="btn-gen" onclick="generateBatch(this)">🎲 توليد دفعة</button>
+<button class="btn ghost" id="btn-prev" onclick="previewOne(this)">👁 معاينة فاتورة واحدة (بدون حفظ)</button>
+{% endblock %}
+{% block content %}
+<form id="genform" onsubmit="return false">
+  <div class="panel">
+    <h2>🏢 الأطراف</h2>
+    <div class="grid2">
+      <div>
+        <label class="f">الشركة البائعة *</label>
+        <select name="company_id" required>
+          {% for c in companies %}
+          <option value="{{ c.id }}" {{ 'selected' if last and last.company_id == c.id }}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f">العملاء * <small>(Ctrl للتحديد المتعدد)</small></label>
+        <select name="customer_ids" multiple size="4" required>
+          {% for c in customers %}
+          <option value="{{ c.id }}" {{ 'selected' if last and c.id in last.customer_ids }}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>📦 أصناف الفواتير</h2>
+    <div class="radios" style="margin-bottom:12px">
+      <label><input type="radio" name="items_mode" value="groups" checked onchange="toggleItemsMode(this.value)"> اختيار حسب المجموعات (تصنف تلقائي)</label>
+      <label><input type="radio" name="items_mode" value="individual" onchange="toggleItemsMode(this.value)"> اختيار أصناف محددة (يدوي)</label>
+    </div>
+    <div id="mode-groups" class="grid2">
+      <div>
+        <label class="f">المجموعات <small>(Ctrl للتحديد المتعدد — بدون تحديد = كل الأصناف)</small></label>
+        <select name="item_group_ids" multiple size="4">
+          {% for grp in groups %}
+          <option value="{{ grp.id }}" {{ 'selected' if last and grp.id in last.item_group_ids }}>{{ grp.name }} ({{ grp.items_count }} صنف)</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="hint" style="align-self:end">اختر مجموعة أو أكثر لتُولَّد أصناف الفواتير عشوائيًا منها حصريًا. بدون تحديد تُستخدم كل الأصناف المعرفة.</div>
+    </div>
+    <div id="mode-individual" class="grid2" style="display:none">
+      <div>
+        <label class="f">الأصناف المحددة <small>(Ctrl للتحديد المتعدد — اختر الأصناف التي ستظهر في الفواتير)</small></label>
+        <select name="item_ids" multiple size="6">
+          {% for grp in groups %}
+          <optgroup label="{{ grp.name }}">
+            {% for item in grp.items_list %}
+            <option value="{{ item.id }}" {{ 'selected' if last and item.id in last.item_ids }}>{{ item.name }} ({{ item.unit_price_display }})</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="hint" style="align-self:end">اختر الأصناف المحددة التي ستظهر في الفواتير. الفاتورة الواحدة قد تحتوي على صنف واحد أو أكثر من هذه القائمة عشوائيًا.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>📅 الفترة والعدد</h2>
+    <div class="grid3">
+      <div><label class="f">من تاريخ</label><input type="date" name="date_from" value="{{ last.date_from if last else def_date_from }}"></div>
+      <div><label class="f">إلى تاريخ</label><input type="date" name="date_to" value="{{ last.date_to if last else def_date_to }}"></div>
+      <div>
+        <label class="f">طريقة تحديد العدد</label>
+        <div class="radios">
+          <label><input type="radio" name="count_mode" value="total" checked> عدد إجمالي</label>
+          <label><input type="radio" name="count_mode" value="daily"> متوسط يومي</label>
+        </div>
+      </div>
+    </div>
+    <div class="grid3">
+      <div><label class="f">عدد الفواتير الإجمالي</label><input type="number" name="count_total" min="1" value="{{ last.count_total if last else 25 }}"></div>
+      <div><label class="f">متوسط الفواتير اليومي</label><input type="number" name="count_daily" step="0.1" min="0.1" value="{{ last.count_daily if last else 2 }}"></div>
+      <div class="hint" style="align-self:end">في وضع «متوسط يومي» يُحسب العدد = المتوسط × عدد أيام الفترة.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>💰 المبالغ</h2>
+    <div class="grid3">
+      <div><label class="f">المبلغ الإجمالي المطلوب (ر.س) *</label><input type="number" name="amount" step="0.01" min="0.01" value="{{ last.amount if last else '50000' }}" required></div>
+      <div>
+        <label class="f">المبلغ المُدخل</label>
+        <div class="radios">
+          <label><input type="radio" name="amount_mode" value="net" {{ 'checked' if last and last.amount_mode == 'net' }}> صافي</label>
+          <label><input type="radio" name="amount_mode" value="gross" {{ 'checked' if not last or last.amount_mode == 'gross' }}> شامل الضريبة</label>
+        </div>
+      </div>
+      <div><label class="f">الحد الأدنى للفاتورة (ر.س)</label><input type="number" name="min_amount" step="0.01" min="1" value="{{ last.min_amount if last else '150' }}"></div>
+    </div>
+    <label class="f">طريقة الدفع</label>
+    <div class="radios">
+      {% for pt in ['نقدي','آجل','تحويل','عشوائي'] %}
+      <label><input type="radio" name="payment_type" value="{{ pt }}" {{ 'checked' if (last and last.payment_type == pt) or (not last and pt == 'عشوائي') }}> {{ pt }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🔒 البذرة والترقيم</h2>
+    <div class="grid3">
+      <div><label class="f">بذرة عشوائية <small>(فارغة = عشوائي)</small></label><input type="text" name="seed" value="{{ last.seed if last else '' }}" placeholder="مثال: 12345"></div>
+      <div><label class="f">بداية ترقيم الفواتير</label><input type="number" name="invoice_start" value="{{ last.invoice_start if last else 1001 }}"></div>
+      <div><label class="f">بادئة الرقم <small>(اختياري)</small></label><input type="text" name="number_prefix" value="{{ last.number_prefix if last else '' }}" placeholder="INV-"></div>
+    </div>
+    <div class="grid3">
+      <div><label class="f">بداية ترقيم السندات</label><input type="number" name="receipt_start" value="{{ last.receipt_start if last else 5001 }}"></div>
+      <div class="hint" style="align-self:end">🔢 الترقيم متسلسل مع فجوات عشوائية (+9 إلى +47) لمحاكاة فواتير ملغاة.</div>
+    </div>
+    <label class="check"><input type="checkbox" name="random_notes" {{ 'checked' if not last or last.random_notes }}> إضافة ملاحظات واقعية لبعض الفواتير</label>
+  </div>
+
+  <div class="panel">
+    <h2>🔗 رمز QR</h2>
+    <div class="radios">
+      <label><input type="radio" name="qr_mode" value="none" {{ 'checked' if not last or last.qr_mode == 'none' }}> بدون</label>
+      <label><input type="radio" name="qr_mode" value="simple" {{ 'checked' if last and last.qr_mode == 'simple' }}> مبسط (TLV 1-5)</label>
+      <label><input type="radio" name="qr_mode" value="phase2" {{ 'checked' if last and last.qr_mode == 'phase2' }}> مرحلة ثانية وهمي (TLV 1-9 + ECDSA تدريبي)</label>
+    </div>
+    <div class="hint">⚠ يتطلب الرمز رقمًا ضريبيًا صحيحًا (15 رقمًا يبدأ بـ 3). وضع المرحلة الثانية محاكاة تدريبية بمفاتيح غير رسمية.</div>
+  </div>
+
+  <div class="panel">
+    <h2>🧾 السندات والقوالب</h2>
+    <label class="check"><input type="checkbox" name="with_receipts" {{ 'checked' if last and last.with_receipts }}> توليد سند مرافق لكل فاتورة</label>
+    <label class="f">نوع السند</label>
+    <div class="radios">
+      {% for rt in ['قبض','صرف','عشوائي'] %}
+      <label><input type="radio" name="receipt_type" value="{{ rt }}" {{ 'checked' if (last and last.receipt_type == rt) or (not last and rt == 'قبض') }}> {{ rt }}</label>
+      {% endfor %}
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="f">قالب الفاتورة</label>
+        <select name="template_invoice_id">
+          <option value="">الافتراضي</option>
+          {% for t in invoice_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f">قالب السند</label>
+        <select name="template_receipt_id">
+          <option value="">الافتراضي</option>
+          {% for t in receipt_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleItemsMode(mode) {
+  document.getElementById('mode-groups').style.display = mode === 'groups' ? '' : 'none';
+  document.getElementById('mode-individual').style.display = mode === 'individual' ? '' : 'none';
+}
+
+function collectForm() {
+  const f = document.getElementById('genform');
+  const d = Object.fromEntries(new FormData(f).entries());
+  d.customer_ids = Array.from(f.querySelector('[name=customer_ids]').selectedOptions).map(o => o.value);
+  d.item_group_ids = Array.from(f.querySelector('[name=item_group_ids]').selectedOptions).map(o => o.value);
+  d.item_ids = Array.from(f.querySelector('[name=item_ids]').selectedOptions).map(o => o.value);
+  d.items_mode = f.querySelector('[name=items_mode]:checked')?.value || 'groups';
+  d.with_receipts = f.querySelector('[name=with_receipts]').checked;
+  d.random_notes = f.querySelector('[name=random_notes]').checked;
+  return d;
+}
+
+async function generateBatch(btn) {
+  const d = collectForm();
+  if (!d.customer_ids || !d.customer_ids.length) { toast('اختر عميلًا واحدًا على الأقل', true); return; }
+  btn.disabled = true; btn.textContent = '⏳ جارٍ التوليد…';
+  try {
+    const j = await api('/api/generate', d);
+    const s = j.summary;
+    toast(`✅ تم توليد ${s.count} فاتورة (${s.receipts} سند) — البذرة: ${s.seed}`);
+    setTimeout(() => location.href = '/invoices?batch_id=' + j.batch_id, 900);
+  } catch (e) {
+    toast(e.message, true);
+    btn.disabled = false; btn.textContent = '🎲 توليد دفعة';
+  }
+}
+
+async function previewOne(btn) {
+  const d = collectForm();
+  if (!d.customer_ids || !d.customer_ids.length) { toast('اختر عميلًا واحدًا على الأقل', true); return; }
+  btn.disabled = true; btn.textContent = '⏳ جارٍ بناء المعاينة…';
+  try {
+    const j = await api('/api/preview-dry', d);
+    const blob = new Blob([j.html], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+    toast('👁 فُتحت معاينة فاتورة من منتصف الدفعة (لم يُحفظ أي شيء)');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = '👁 معاينة فاتورة واحدة (بدون حفظ)';
+  }
+}
+</script>
+{% endblock %}

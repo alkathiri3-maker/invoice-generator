@@ -1,0 +1,155 @@
+{% extends "layout.html" %}
+{% block title %}القوالب — {{ APP_NAME }}{% endblock %}
+{% block page_title %}قوالب الفواتير والسندات{% endblock %}
+{% block actions %}
+<button class="btn" onclick="openTheme()">🎨 المظهر والتنبيهات</button>
+<button class="btn ghost" onclick="openAdd()">＋ قالب جديد</button>
+{% endblock %}
+{% block content %}
+<div class="summary-strip">
+  🎨 <b>المظهر والتنبيهات</b> تُطبَّق على كل الفواتير والسندات (لون، شريط تحذيري، ختم مائي).
+  زر «🎨 محرر مرئي» يفتح <b>محرر القالب في صفحة مستقلة</b> — المصمم المتقدم الكامل: الهيدر والشعار وبيانات الشركة (تخصيص كل شركة على حدة)، عنوان المستند، بطاقة العميل وإظهار/إخفاء السجل التجاري وبيانات البائع والمشتري، جدول البنود (ألوان وحدود ومسافات)، صندوق المبالغ، التذييل وشروط الطباعة، وموضع وحجم الباركود — بمعاينة حية على A4 للفواتير والسندات — وزر «✏️ تحرير HTML» يفتح نفس الصفحة على تبويب HTML لمن يريد تحكمًا كاملًا.
+</div>
+<div class="panel" style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+  <div style="display:flex;gap:6px;align-items:center" title="اللون الرئيسي">
+    <span>اللون الرئيسي</span><span style="width:34px;height:22px;border-radius:6px;display:inline-block;background:{{ theme.primary_color }};border:1px solid var(--line)"></span>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center" title="لون شريط التنبيه">
+    <span>لون التنبيه</span><span style="width:34px;height:22px;border-radius:6px;display:inline-block;background:{{ theme.alert_banner_color }};border:1px solid var(--line)"></span>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <span>شريط التنبيه</span>
+    <span class="badge {{ 'green' if theme.alert_banner_enabled else 'red' }}">{{ 'مفعّل' if theme.alert_banner_enabled else 'معطّل' }}</span>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <span>الختم المائي</span>
+    <span class="badge {{ 'green' if theme.show_watermark else 'red' }}">{{ 'ظاهر' if theme.show_watermark else 'مخفي' }}</span>
+  </div>
+  <div class="hint" style="flex:1;min-width:220px">الختم: «{{ theme.watermark_text }}» — التذييل: «{{ theme.footer_notice }}»</div>
+</div>
+<div class="panel">
+  {% if rows %}
+  <table class="tbl">
+    <thead><tr><th>الاسم</th><th>النوع</th><th>الحجم</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}" data-name="{{ r.name }}" data-type="{{ r.type }}" data-size="{{ r.html_content|length }}">
+        <td><b>{{ r.name }}</b></td>
+        <td><span class="badge {{ 'blue' if r.type == 'invoice' else 'green' }}">{{ 'فاتورة' if r.type == 'invoice' else 'سند' }}</span></td>
+        <td class="muted">{{ (r.html_content|length / 1024)|round(1) }} ك.ب</td>
+                                         <td style="white-space:nowrap">
+          <a class="btn sm ghost" target="_blank" href="{{ url_for('pages.template_preview', tpl_id=r.id) }}">👁 معاينة</a>
+          <a class="btn sm amber" href="{{ url_for('pages.template_editor_page', tpl_id=r.id) }}">🎨 محرر مرئي</a>
+          <a class="btn sm" href="{{ url_for('pages.template_editor_page', tpl_id=r.id, tab='html') }}">✏️ تحرير HTML</a>
+          <button class="btn sm amber-ghost" onclick="resetTpl({{ r.id }})">↺ استعادة الافتراضي</button>
+          <button class="btn sm red" onclick="deleteRow('templates', {{ r.id }}, 'القالب')">🗑 حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">لا توجد قوالب</div>{% endif %}
+</div>
+
+<dialog id="dlg" class="wide">
+  <h3 id="dlg-title">قالب جديد</h3>
+  <form id="frm" onsubmit="return false">
+    <input type="hidden" name="id">
+    <div class="grid2">
+      <div><label class="f">اسم القالب *</label><input type="text" name="name" required></div>
+      <div>
+        <label class="f">النوع *</label>
+        <select name="type">
+          <option value="invoice">فاتورة</option>
+          <option value="receipt">سند</option>
+        </select>
+      </div>
+    </div>
+    <label class="f">محتوى HTML (Jinja2)</label>
+    <textarea class="code" name="html_content" spellcheck="false"></textarea>
+    <div class="hint">⚠ القالب يُستخدم كما هو — تأكد من صحة HTML قبل الحفظ. لتعديل قالب موجود (مرئيًا أو HTML) استخدم صفحة «محرر القالب» من الجدول.</div>
+    <div class="dlg-actions">
+      <button class="btn" type="submit">💾 حفظ القالب</button>
+      <button class="btn ghost" type="button" onclick="closeDlg('dlg')">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="themedlg" class="wide">
+  <h3>🎨 تخصيص المظهر والتنبيهات</h3>
+  <p class="hint" style="margin:4px 0 8px">التغييرات تُطبَّق فورًا على كل الفواتير والسندات والـ PDF. للتحكم الكامل في التصميم استخدم «✏️ تحرير HTML».</p>
+  <form id="themeform" onsubmit="return false">
+    <div class="grid3">
+      <div><label class="f">اللون الرئيسي <small>(ترويسة الجدول والعناوين)</small></label><input type="color" name="primary_color" value="{{ theme.primary_color }}" style="height:42px;padding:3px"></div>
+      <div><label class="f">لون نص الترويسة</label><input type="color" name="header_text_color" value="{{ theme.header_text_color }}" style="height:42px;padding:3px"></div>
+      <div>
+        <label class="f">خط المستندات</label>
+        <select name="font_family">
+          {% for f in font_choices %}<option value="{{ f }}" {{ 'selected' if theme.font_family == f }}>{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid3">
+      <div>
+        <label class="f">حجم الخط الأساسي</label>
+        <select name="font_size">
+          {% for s in font_sizes %}<option value="{{ s }}" {{ 'selected' if theme.font_size == s }}>{{ s }}px</option>{% endfor %}
+        </select>
+      </div>
+      <div><label class="f">لون شريط التنبيه</label><input type="color" name="alert_banner_color" value="{{ theme.alert_banner_color }}" style="height:42px;padding:3px"></div>
+      <div><label class="f">خلفية شريط التنبيه</label><input type="color" name="alert_banner_bg" value="{{ theme.alert_banner_bg }}" style="height:42px;padding:3px"></div>
+    </div>
+    <div class="grid3">
+      <div class="check" style="margin-top:14px"><input type="checkbox" id="abe" {{ 'checked' if theme.alert_banner_enabled }}><label for="abe">إظهار شريط التنبيه التحذيري</label></div>
+      <div class="check" style="margin-top:14px"><input type="checkbox" id="sw" {{ 'checked' if theme.show_watermark }}><label for="sw">إظهار الختم المائي</label></div>
+    </div>
+    <label class="f">نص شريط التنبيه التحذيري <small>(مثال: تحذير بخصوص فك التشفير / الاستخدام الرسمي)</small></label>
+    <textarea name="alert_banner_text" style="min-height:70px">{{ theme.alert_banner_text }}</textarea>
+    <div class="grid2">
+      <div><label class="f">نص الختم المائي</label><input type="text" name="watermark_text" value="{{ theme.watermark_text }}"></div>
+      <div><label class="f">نص التذييل التحذيري</label><input type="text" name="footer_notice" value="{{ theme.footer_notice }}"></div>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" type="submit">💾 حفظ المظهر</button>
+      <button class="btn ghost" type="button" onclick="closeDlg('themedlg')">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+const THEME = {{ theme | tojson }};
+function openTheme() {
+  for (const k of Object.keys(THEME)) {
+    const el = document.getElementById('themeform').querySelector(`[name=${k}]`);
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!THEME[k];
+    else el.value = THEME[k] ?? '';
+  }
+  openDlg('themedlg');
+}
+document.getElementById('themeform').addEventListener('submit', async () => {
+  const f = document.getElementById('themeform');
+  const d = Object.fromEntries(new FormData(f).entries());
+  d.alert_banner_enabled = f.querySelector('#abe').checked;
+  d.show_watermark = f.querySelector('#sw').checked;
+  try {
+    await api('/api/theme', d);
+    toast('✅ تم حفظ المظهر — سيُطبق على كل المستندات');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, true); }
+});
+function openAdd() {
+  const f = document.getElementById('frm');
+  f.reset();
+  document.getElementById('dlg-title').textContent = 'قالب جديد';
+  openDlg('dlg');
+}
+async function resetTpl(id) {
+  confirmThen('استعادة المحتوى الافتراضي لهذا القالب؟', async () => {
+    try { await api('/api/templates/' + id + '/reset', {}); toast('تمت الاستعادة'); setTimeout(() => location.reload(), 350); }
+    catch (e) { toast(e.message, true); }
+  });
+}
+document.getElementById('frm').addEventListener('submit', () => submitModal(document.getElementById('frm'), '/api/templates'));
+</script>
+{% endblock %}

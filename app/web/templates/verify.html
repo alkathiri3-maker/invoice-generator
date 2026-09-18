@@ -1,0 +1,103 @@
+{% extends "layout.html" %}
+{% block title %}فحص الباركود — {{ APP_NAME }}{% endblock %}
+{% block page_title %}فحص وتحقق الباركود (QR){% endblock %}
+{% block content %}
+
+{% macro result_panel(res, inv=None, big_qr=None) %}
+<div class="panel">
+  <h2>
+    {% if inv %}نتيجة فحص فاتورة #{{ inv.invoice_number }}{% else %}نتيجة فحص النص الملصوق{% endif %}
+    <span class="badge {{ 'blue' if res.mode != 'simple' else 'green' }}">
+      {{ 'مرحلة ثانية وهمي (وسوم 1-9)' if res.mode == 'phase2' else ('مبسط (وسوم 1-5)' if res.mode == 'simple' else 'حمولة خارجية') }}
+    </span>
+  </h2>
+  <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+    {% if big_qr %}
+    <div style="text-align:center">
+      <img src="{{ big_qr }}" style="width:230px;height:230px;border:1px solid var(--line);border-radius:10px;background:#fff">
+      <div class="hint" style="max-width:230px">امسحه بأي ماسح — سيقرأ نص Base64 أدناه</div>
+      <a class="btn sm ghost" style="margin-top:8px" href="/verify/{{ inv.id }}/xml">⬇ تنزيل XML (وسم 6)</a>
+      <a class="btn sm ghost" style="margin-top:8px;display:block" href="/verify/{{ inv.id }}/demo" target="_blank">🌐 صفحة HTML للتجربة</a>
+    </div>
+    {% endif %}
+    <div style="flex:1;min-width:290px">
+      <h3 style="font-size:13.5px;margin-bottom:8px;color:var(--primary-dark)">الفحوصات — نفس منطق تطبيق ZATCA مع قبول شهادة التدريب</h3>
+      <table class="tbl">
+        {% for c in res.checks %}
+        <tr>
+          <td style="width:36px;text-align:center;font-size:15px">{{ c.icon }}</td>
+          <td><b>{{ c.name }}</b>{% if c.detail %}<div class="muted" style="font-size:11.5px;word-break:break-all">{{ c.detail }}</div>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div style="flex:1;min-width:280px">
+      <h3 style="font-size:13.5px;margin-bottom:8px;color:var(--primary-dark)">الوسوم (TLV)</h3>
+      <table class="tbl">
+        <tr><th>الوسم</th><th>المحتوى</th><th class="num">الطول</th></tr>
+        {% for t in res.tags %}
+        <tr>
+          <td><b>{{ t.tag }}</b></td>
+          <td>{{ t.label }}{% if t.value|length <= 50 %}<div class="muted" style="font-size:11px;word-break:break-all">{{ t.value }}</div>{% endif %}</td>
+          <td class="num">{{ t.bytes }} بايت</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <label class="f">الحمولة Base64 (المقروءة من الماسح)</label>
+      <textarea class="code" style="min-height:100px" readonly>{{ res.payload_b64 }}</textarea>
+      {% if res.xml %}
+      <label class="f">XML الفاتورة — مصدر حساب الوسم 6</label>
+      <textarea class="code" style="min-height:140px" readonly>{{ res.xml }}</textarea>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+<div class="panel">
+  <h2>🧾 فحص فاتورة من القاعدة</h2>
+  {% if rows %}
+  <div class="filters">
+    <div style="flex:2">
+      <label class="f">اختر فاتورة لديها باركود</label>
+      <select name="inv_id" onchange="if(this.value) location.href='/verify/'+this.value;">
+        <option value="">— اختر فاتورة —</option>
+        {% for r in rows %}
+        <option value="{{ r.id }}" {{ 'selected' if inv_row and inv_row.id == r.id }}>
+          #{{ r.invoice_number }} — {{ r.customer_name }} — {{ r.invoice_date|adate }} — {{ r.total_amount|sar }} ر.س ({{ 'مرحلة ثانية' if r.qr_mode == 'phase2' else 'مبسط' }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">لا توجد فواتير بباركود — ولّد دفعة مع اختيار نمط QR (مبسط أو مرحلة ثانية) أولًا</div>
+  {% endif %}
+</div>
+
+{% if no_qr and inv_row %}
+<div class="panel"><div class="empty">⚠ الفاتورة #{{ inv_row.invoice_number }} ولدت بدون باركود — أعد التوليد مع اختيار نمط QR</div></div>
+{% endif %}
+
+{% if result %}{{ result_panel(result, inv_row, big_qr) }}{% endif %}
+
+<div class="panel">
+  <h2>📋 فحص نص Base64 ممسوح من الجوال</h2>
+  <p class="hint" style="margin-bottom:10px">امسح الباركود بأي تطبيق ماسح، انسخ النص الظاهر، وألصقه هنا لتفكيك الوسوم والتحقق منها.</p>
+  <form method="post" action="/verify">
+    <textarea class="code" name="b64" style="min-height:110px" placeholder="مثال: AVZBZcSM4r7d0eLeu..." spellcheck="false">{{ request.form.get('b64', '') }}</textarea>
+    <div class="dlg-actions"><button class="btn" type="submit">🔍 فحص النص</button></div>
+  </form>
+  {% if pasted %}{{ result_panel(pasted) }}{% endif %}
+</div>
+
+<div class="panel">
+  <h2>ℹ️ لماذا يرفض تطبيق ZATCA الرسمي الباركود التدريبي؟</h2>
+  <p class="muted" style="line-height:2">
+    تطبيق الهيئة يتحقق من سلسلة كاملة: هاش XML (وسم 6) ← التوقيع ECDSA (وسم 7) ← المفتاح العام (وسم 8)
+    ← شهادة ختم تشفيري <b>CSID صادرة من ZATCA</b> (وسم 9). شهادتنا هنا تدريبية موقعة ذاتيًا،
+    لذا سيرفض التطبيق الرسمي الرمز دائمًا — وهذا متوقع ومقصود في أداة تدريبية.
+    المدقق في هذه الصفحة ينفذ نفس الفحوصات الرياضية (الهاش والتوقيع) ويعطي نتيجة ✔ بإسناد كامل قابل للتدقيق.
+  </p>
+</div>
+{% endblock %}

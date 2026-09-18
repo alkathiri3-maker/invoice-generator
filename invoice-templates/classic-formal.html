@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الفاتورة الضريبية - Tax Invoice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            color: #000;
+            background: #f5f5f5;
+            padding: 15px;
+        }
+
+        .invoice-container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: white;
+            border: 3px solid #000;
+        }
+
+        /* Header Block */
+        .header-block {
+            border-bottom: 2px solid #000;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 15px;
+        }
+
+        .company-logo-area {
+            width: 80px;
+            height: 80px;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: #999;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .company-main {
+            flex: 1;
+            padding: 0 20px;
+            text-align: center;
+        }
+
+        .company-main h1 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .company-main p {
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .invoice-title-block {
+            text-align: center;
+        }
+
+        .invoice-title-block h2 {
+            font-size: 16px;
+            font-weight: bold;
+            border: 2px solid #000;
+            padding: 8px 15px;
+            display: inline-block;
+        }
+
+        /* Tax Number Header */
+        .tax-header {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #000;
+            font-weight: bold;
+        }
+
+        .tax-info {
+            font-size: 11px;
+        }
+
+        .tax-info label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .tax-info value {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Invoice Details */
+        .invoice-details {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 20px;
+            border-bottom: 1px solid #000;
+            font-size: 11px;
+        }
+
+        .detail-box {
+            flex: 1;
+            padding: 0 10px;
+        }
+
+        .detail-box label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .detail-box value {
+            font-size: 11px;
+        }
+
+        /* Parties */
+        .parties {
+            display: flex;
+            border-bottom: 1px solid #000;
+        }
+
+        .party {
+            flex: 1;
+            padding: 15px 20px;
+            border-right: 1px solid #000;
+            font-size: 11px;
+        }
+
+        .party:last-child {
+            border-right: none;
+        }
+
+        .party h4 {
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 5px;
+            font-size: 11px;
+        }
+
+        .party-info p {
+            margin-bottom: 3px;
+            line-height: 1.4;
+        }
+
+        /* Items Table */
+        .items-wrapper {
+            overflow-x: auto;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .items-table,
+        .items-table tr,
+        .items-table th,
+        .items-table td {
+            border: 1px solid #000;
+        }
+
+        .items-table th {
+            background: #f0f0f0;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid #000;
+        }
+
+        .items-table td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #000;
+        }
+
+        .item-desc-col {
+            text-align: right;
+        }
+
+        .item-name {
+            font-weight: bold;
+        }
+
+        .item-description {
+            font-size: 10px;
+            color: #666;
+        }
+
+        /* Summary */
+        .summary-section {
+            display: flex;
+            border-bottom: 1px solid #000;
+        }
+
+        .summary-left {
+            flex: 1;
+            padding: 20px;
+            border-right: 1px solid #000;
+            font-size: 11px;
+        }
+
+        .summary-right {
+            width: 350px;
+            padding: 20px;
+        }
+
+        .summary-left h4 {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 11px;
+        }
+
+        .summary-left p {
+            margin-bottom: 5px;
+            line-height: 1.6;
+        }
+
+        .summary-box {
+            font-size: 11px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .summary-row.total {
+            border-bottom: 2px solid #000;
+            border-top: 2px solid #000;
+            font-weight: bold;
+            padding: 8px 0;
+            margin: 8px 0;
+        }
+
+        /* Bank Section */
+        .bank-section {
+            padding: 20px;
+            border-bottom: 1px solid #000;
+            font-size: 11px;
+        }
+
+        .bank-section h4 {
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-decoration: underline;
+        }
+
+        .bank-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .bank-detail {
+            padding: 8px;
+            border: 1px solid #000;
+        }
+
+        .bank-detail label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 3px;
+            font-size: 10px;
+        }
+
+        .bank-detail value {
+            font-size: 11px;
+        }
+
+        /* Terms & Conditions */
+        .terms-section {
+            padding: 20px;
+            border-bottom: 1px solid #000;
+            font-size: 10px;
+        }
+
+        .terms-section h4 {
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-decoration: underline;
+        }
+
+        .terms-section ol {
+            margin-right: 20px;
+            line-height: 1.6;
+        }
+
+        .terms-section li {
+            margin-bottom: 4px;
+        }
+
+        /* Signature Section */
+        .signature-section {
+            display: flex;
+            justify-content: space-around;
+            padding: 30px 20px;
+            font-size: 11px;
+        }
+
+        .signature-block {
+            text-align: center;
+            width: 200px;
+        }
+
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-bottom: 30px;
+            height: 60px;
+            position: relative;
+        }
+
+        .stamp-area {
+            border: 1px dashed #000;
+            width: 120px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 10px;
+            margin: 0 auto;
+        }
+
+        .signature-label {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 15px 20px;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .invoice-container {
+                box-shadow: none;
+                max-width: 100%;
+                margin: 0;
+            }
+
+            a {
+                text-decoration: none;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .parties {
+                flex-direction: column;
+            }
+
+            .party {
+                border-right: none;
+                border-bottom: 1px solid #000;
+            }
+
+            .party:last-child {
+                border-bottom: none;
+            }
+
+            .summary-section {
+                flex-direction: column;
+            }
+
+            .summary-left {
+                border-right: none;
+                border-bottom: 1px solid #000;
+            }
+
+            .summary-right {
+                width: 100%;
+            }
+
+            .bank-details {
+                grid-template-columns: 1fr;
+            }
+
+            .signature-section {
+                flex-direction: column;
+                gap: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header Block -->
+        <div class="header-block">
+            <div class="header-top">
+                <div class="company-logo-area">LOGO</div>
+                <div class="company-main">
+                    <h1>{{ company.name }}</h1>
+                    <p>{{ company.address }}</p>
+                    <p>{{ company.phone }}</p>
+                </div>
+                <div class="invoice-title-block">
+                    <h2>الفاتورة الضريبية<br/>Tax Invoice</h2>
+                </div>
+            </div>
+            <div class="tax-header">
+                <div class="tax-info">
+                    <label>رقم الضريبة / VAT No.:</label>
+                    <value>{{ company.tax_number }}</value>
+                </div>
+                <div class="tax-info">
+                    <label>الرقم التسلسلي / Serial No.:</label>
+                    <value>{{ inv.number }}</value>
+                </div>
+                <div class="tax-info">
+                    <label>التاريخ / Date:</label>
+                    <value>{{ inv.date_display }}</value>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Details -->
+        <div class="invoice-details">
+            <div class="detail-box">
+                <label>تاريخ الاستحقاق / Due Date:</label>
+                <value>{{ inv.due_date }}</value>
+            </div>
+            <div class="detail-box">
+                <label>طريقة الدفع / Payment Terms:</label>
+                <value>{{payment_terms}}</value>
+            </div>
+            <div class="detail-box">
+                <label>المرجع / Reference:</label>
+                <value>{{reference_number}}</value>
+            </div>
+        </div>
+
+        <!-- Parties -->
+        <div class="parties">
+            <div class="party">
+                <h4>من / FROM:</h4>
+                <div class="party-info">
+                    <p><strong>{{ company.name }}</strong></p>
+                    <p>{{company_full_address}}</p>
+                    <p>الهاتف / Tel: {{ company.phone }}</p>
+                    <p>الفاكس / Fax: {{company_fax}}</p>
+                </div>
+            </div>
+            <div class="party">
+                <h4>إلى / TO:</h4>
+                <div class="party-info">
+                    <p><strong>{{ customer.name }}</strong></p>
+                    <p>{{ customer.address }}</p>
+                    <p>رقم الضريبة: {{ customer.tax_number }}</p>
+                    <p>الهاتف: {{customer_phone}}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-wrapper">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th class="item-desc-col">الوصف / Description</th>
+                        <th style="width: 80px;">الكمية / Qty</th>
+                        <th style="width: 100px;">السعر / Unit Price</th>
+                        <th style="width: 100px;">الضريبة / Tax</th>
+                        <th style="width: 100px;">الإجمالي / Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in inv.lines %}
+                    <tr>
+                        <td>{{item_index}}</td>
+                        <td class="item-desc-col">
+                            <div class="item-name">{{ line.name }}</div>
+                            <div class="item-description">{{ line.description or "" }}</div>
+                        </td>
+                        <td>{{ line.quantity_display }}</td>
+                        <td>{{ line.unit_price_display }} ر.س</td>
+                        <td>{{ line.line_tax_display }} ر.س</td>
+                        <td>{{ line.line_gross_display }} ر.س</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-left">
+                <h4>ملاحظات / Notes:</h4>
+                <p>{{notes}}</p>
+            </div>
+            <div class="summary-right">
+                <div class="summary-box">
+                    <div class="summary-row">
+                        <span>الإجمالي قبل الضريبة</span>
+                        <span>{{ inv.subtotal_display }} ر.س</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>الخصم / Discount</span>
+                        <span>{{ inv.discount_display or "0.00" }} ر.س</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>ضريبة (15%)</span>
+                        <span>{{ inv.tax_display }} ر.س</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>المجموع / TOTAL</span>
+                        <span>{{ inv.total_display }} ر.س</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bank Section -->
+        <div class="bank-section">
+            <h4>تفاصيل التحويل البنكي / Bank Transfer Details:</h4>
+            <div class="bank-details">
+                <div class="bank-detail">
+                    <label>اسم البنك / Bank Name:</label>
+                    <value>{{ inv.bank_name or "" }}</value>
+                </div>
+                <div class="bank-detail">
+                    <label>IBAN:</label>
+                    <value>{{ inv.bank_iban or "" }}</value>
+                </div>
+                <div class="bank-detail">
+                    <label>رقم الحساب / Account Number:</label>
+                    <value>{{ inv.bank_account or "" }}</value>
+                </div>
+                <div class="bank-detail">
+                    <label>Swift Code:</label>
+                    <value>{{ inv.bank_swift or "" }}</value>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terms & Conditions -->
+        <div class="terms-section">
+            <h4>الشروط والأحكام / Terms & Conditions:</h4>
+            <ol>
+                <li>هذه الفاتورة صحيحة وفقا لقوانين الزكاة والضريبة على الدخل / This invoice is valid according to VAT regulations</li>
+                <li>يجب دفع الفاتورة حسب شروط الدفع المذكورة أعلاه / Payment should be made as per terms mentioned above</li>
+                <li>نطلب منكم إرسال تأكيد الاستلام / Please send confirmation of receipt</li>
+            </ol>
+        </div>
+
+        <!-- Signature Section -->
+        <div class="signature-section">
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="stamp-area">ختم الشركة<br/>Company Stamp</div>
+                <div class="signature-label">توقيع المفوض<br/>Authorized Signature</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <p style="margin-top: 40px;">المحاسب<br/>Accountant</p>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <p style="margin-top: 40px;">العميل<br/>Customer</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>{{ company.website }} | {{ company.email }}</p>
+            <p>شكراً لتعاملك معنا / Thank you for your business</p>
+            <p>هذه نسخة آلية من الفاتورة الضريبية / This is an automated copy of tax invoice</p>
+        </div>
+    </div>
+</body>
+</html>

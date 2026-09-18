@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الفاتورة - Receipt Invoice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 80mm;
+            margin: 0 auto;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #000;
+            background: white;
+            padding: 0;
+            line-height: 1.2;
+        }
+
+        .receipt-container {
+            width: 80mm;
+            padding: 3mm;
+            background: white;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 4mm;
+            padding-bottom: 4mm;
+            border-bottom: 1px dashed #000;
+        }
+
+        .header h1 {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .header p {
+            font-size: 8px;
+            margin: 1px 0;
+        }
+
+        /* Invoice Info */
+        .receipt-info {
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 1px dashed #000;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            margin-bottom: 2px;
+        }
+
+        .info-label {
+            font-weight: bold;
+        }
+
+        .info-value {
+            text-align: left;
+        }
+
+        /* Customer Info */
+        .customer-section {
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 1px dashed #000;
+            font-size: 9px;
+        }
+
+        .customer-section h4 {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .customer-info {
+            line-height: 1.3;
+        }
+
+        /* Items List */
+        .items-section {
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 1px dashed #000;
+        }
+
+        .items-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin-bottom: 2px;
+            font-size: 8px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            font-size: 9px;
+            padding: 2px 0;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .item-name {
+            flex: 1;
+            font-weight: bold;
+            word-break: break-word;
+        }
+
+        .item-qty {
+            width: 12mm;
+            text-align: center;
+            font-size: 8px;
+        }
+
+        .item-price {
+            width: 15mm;
+            text-align: center;
+            font-size: 8px;
+        }
+
+        .item-total {
+            width: 15mm;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .item-detail {
+            font-size: 8px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Tax Summary */
+        .tax-section {
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 1px dashed #000;
+        }
+
+        .tax-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+            font-size: 9px;
+        }
+
+        .tax-label {
+            font-weight: bold;
+        }
+
+        /* Total */
+        .total-section {
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 2px solid #000;
+            text-align: center;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+
+        .total-label {
+            text-align: right;
+        }
+
+        .total-amount {
+            text-align: left;
+            flex: 1;
+        }
+
+        /* QR Code */
+        .qr-section {
+            text-align: center;
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 1px dashed #000;
+        }
+
+        .qr-section h4 {
+            font-size: 8px;
+            font-weight: bold;
+            margin-bottom: 3mm;
+        }
+
+        .qr-code-box {
+            width: 50mm;
+            height: 50mm;
+            margin: 0 auto;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+        }
+
+        .qr-placeholder {
+            color: #999;
+            font-size: 8px;
+            text-align: center;
+        }
+
+        /* Payment Method */
+        .payment-section {
+            margin-bottom: 3mm;
+            padding-bottom: 3mm;
+            border-bottom: 1px dashed #000;
+            font-size: 9px;
+        }
+
+        .payment-section h4 {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .payment-details {
+            font-size: 8px;
+            line-height: 1.4;
+        }
+
+        .payment-details p {
+            margin: 1px 0;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            font-size: 8px;
+            color: #666;
+            line-height: 1.3;
+        }
+
+        .footer p {
+            margin-bottom: 2px;
+        }
+
+        .thank-you {
+            margin-bottom: 3mm;
+            font-weight: bold;
+            color: #000;
+        }
+
+        /* Spacing Classes */
+        .divider {
+            border-bottom: 1px dashed #000;
+            margin: 3mm 0;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                width: 80mm;
+                padding: 0;
+                margin: 0;
+            }
+
+            .receipt-container {
+                padding: 3mm;
+                width: 80mm;
+                margin: 0;
+            }
+
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+
+            * {
+                box-shadow: none !important;
+            }
+        }
+
+        /* Mobile optimization */
+        @media (max-width: 600px) {
+            html, body {
+                width: 100%;
+            }
+
+            .receipt-container {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>{{ company.name }}</h1>
+            <p>{{ company.address }}</p>
+            <p>الهاتف: {{ company.phone }}</p>
+        </div>
+
+        <!-- Invoice Info -->
+        <div class="receipt-info">
+            <div class="info-row">
+                <span class="info-label">رقم الفاتورة:</span>
+                <span class="info-value">{{ inv.number }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">التاريخ:</span>
+                <span class="info-value">{{ inv.date_display }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">رقم الضريبة:</span>
+                <span class="info-value">{{ company.tax_number }}</span>
+            </div>
+        </div>
+
+        <!-- Customer -->
+        <div class="customer-section">
+            <h4>العميل / Customer</h4>
+            <div class="customer-info">
+                <div>{{ customer.name }}</div>
+                <div style="font-size: 8px; color: #666;">{{customer_phone}}</div>
+            </div>
+        </div>
+
+        <!-- Items -->
+        <div class="items-section">
+            <div class="items-header">
+                <span style="flex: 1;">الصنف</span>
+                <span class="item-qty">كم</span>
+                <span class="item-price">السعر</span>
+                <span class="item-total">الإجمالي</span>
+            </div>
+
+            {% for line in inv.lines %}
+            <div class="item-row">
+                <span class="item-name">{{ line.name }}</span>
+                <span class="item-qty">{{ line.quantity_display }}</span>
+                <span class="item-price">{{ line.unit_price_display }}</span>
+                <span class="item-total">{{ line.line_gross_display }}</span>
+            </div>
+            {% for item in item_description %}
+            <div class="item-detail">
+                <span>{{ line.description or "" }}</span>
+                <span>ضريبة: {{ line.line_tax_display }}</span>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+
+        <!-- Tax Summary -->
+        <div class="tax-section">
+            <div class="tax-row">
+                <span class="tax-label">الإجمالي:</span>
+                <span>{{ inv.subtotal_display }} ر.س</span>
+            </div>
+            <div class="tax-row">
+                <span class="tax-label">الضريبة (15%):</span>
+                <span>{{ inv.tax_display }} ر.س</span>
+            </div>
+        </div>
+
+        <!-- Total -->
+        <div class="total-section">
+            <div class="total-row">
+                <span class="total-label">المجموع / TOTAL:</span>
+            </div>
+            <div style="text-align: center; font-size: 13px; font-weight: bold; margin: 3mm 0;">
+                {{ inv.total_display }} ر.س
+            </div>
+        </div>
+
+        <!-- QR Code -->
+        <div class="qr-section">
+            <h4>ZATCA QR Code</h4>
+            <div class="qr-code-box">
+                <div class="qr-placeholder">
+                    {{ inv.qr_img or "" }}<br/>
+                    <span style="font-size: 7px;">Scan QR</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="payment-section">
+            <h4>طريقة الدفع / Payment Method</h4>
+            <div class="payment-details">
+                <p>{{ inv.payment_type }}</p>
+                {% for item in bank_name %}
+                <p>البنك: {{ inv.bank_name or "" }}</p>
+                <p>IBAN: {{ inv.bank_iban or "" }}</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="thank-you">شكراً لتعاملك معنا</div>
+            <p>Thank You For Your Business</p>
+            <p style="margin-top: 3mm; font-size: 7px;">
+                هذه فاتورة ضريبية صادرة وفقاً لأنظمة الزكاة<br/>
+                والضريبة على الدخل
+            </p>
+            <p style="margin-top: 2mm; font-size: 7px;">
+                {{ company.website }}<br/>
+                {{ company.email }}
+            </p>
+            <p style="margin-top: 3mm;">----- END OF RECEIPT -----</p>
+        </div>
+    </div>
+
+    <script>
+        // Auto-print on load (optional)
+        // window.print();
+    </script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+{% set primary = theme.primary_color or company.color %}
+{% set head_text = theme.header_text_color or '#ffffff' %}
+<title>{{ doc_title }} رقم {{ inv.number }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Cairo', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif; color: #1c2230; background: #f1f5f9; font-size: 13px; }
+  .corp-doc { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 14mm 12mm; background: #fff; overflow: hidden; box-shadow: 0 2px 14px rgba(0,0,0,.14); }
+  .corp-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+  .corp-watermark span { transform: rotate(-32deg); font-size: 84px; font-weight: 800; color: rgba(220,38,38,.10); border: 6px solid rgba(220,38,38,.25); border-radius: 18px; padding: 6px 30px; white-space: nowrap; }
+  .corp-alert { border-radius: 8px; padding: 10px 14px; font-weight: 800; font-size: 11.5px; text-align: center; line-height: 1.8; margin-bottom: 14px; }
+  .corp-doc > *:not(.corp-watermark) { position: relative; z-index: 1; }
+
+  /* ===== الترويسة ===== */
+  .corp-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid {{ primary }}; padding-bottom: 14px; margin-bottom: 18px; }
+  .corp-seller { display: flex; align-items: flex-start; gap: 12px; max-width: 60%; }
+  .corp-logo { max-width: 26mm; max-height: 26mm; object-fit: contain; }
+  .corp-logo-fallback { width: 20mm; height: 20mm; border-radius: 10px; background: {{ primary }}; color: {{ head_text }}; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; }
+  .corp-seller-name { font-size: 19px; font-weight: 700; color: {{ primary }}; margin: 0 0 4px; line-height: 1.4; }
+  .corp-seller-meta { font-size: 11.5px; color: #3a4250; line-height: 1.9; }
+  .corp-seller-meta .lbl { color: #8a93a0; }
+  .corp-seller-meta b { color: #1c2230; font-weight: 700; }
+
+  .corp-badge { text-align: left; }
+  .corp-title-ar { font-size: 22px; font-weight: 700; color: {{ primary }}; margin: 0 0 2px; }
+  .corp-title-en { font-size: 11px; color: #8a93a0; margin: 0 0 10px; }
+  .corp-num-box { background: #f3f5f9; border: 1px solid #dde3ec; border-radius: 4px; padding: 8px 12px; font-size: 11.5px; line-height: 1.9; min-width: 200px; }
+  .corp-num-box .row { display: flex; justify-content: space-between; gap: 12px; }
+  .corp-num-box .val { font-weight: 600; color: {{ primary }}; }
+
+  /* ===== الأطراف ===== */
+  .corp-parties { display: flex; gap: 16px; margin-bottom: 20px; }
+  .corp-party { flex: 1; border: 1px solid #e3e7ee; border-radius: 4px; padding: 12px 14px; }
+  .corp-party h4 { margin: 0 0 8px; font-size: 11px; color: {{ primary }}; border-bottom: 1px solid #eef1f6; padding-bottom: 6px; font-weight: 700; }
+  .corp-party .field { font-size: 12px; margin-bottom: 4px; color: #2c313b; }
+  .corp-party .field .label { color: #8a93a0; display: inline-block; min-width: 78px; }
+/* ===== جدول الأصناف ===== */
+  table.corp-items { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  table.corp-items thead th { background: {{ primary }}; color: {{ head_text }}; font-size: 11.5px; font-weight: 600; padding: 9px 8px; text-align: center; }
+  table.corp-items thead th:first-child { border-radius: 4px 0 0 0; }
+  table.corp-items thead th:last-child { border-radius: 0 4px 0 0; }
+  table.corp-items tbody td { font-size: 12px; padding: 8px 8px; border-bottom: 1px solid #edf0f5; text-align: center; color: #2c313b; }
+  table.corp-items tbody td.desc { text-align: right; }
+  table.corp-items tbody tr:nth-child(even) { background: #f9fafc; }
+  .corp-code { font-size: 10px; color: #a7aebb; }
+
+  /* ===== الإجماليات ===== */
+  .corp-totals-wrap { display: flex; justify-content: space-between; margin-top: 16px; }
+  .corp-words { flex: 1; font-size: 11.5px; color: #5b6472; padding-top: 6px; line-height: 1.9; max-width: 55%; }
+  .corp-words .label { color: #8a93a0; display: block; margin-bottom: 4px; }
+  .corp-totals { width: 220px; font-size: 12.5px; }
+  .corp-totals .row { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid #eef1f6; }
+  .corp-totals .row.grand { background: {{ primary }}; color: {{ head_text }}; font-weight: 700; border-radius: 4px; margin-top: 4px; border-bottom: none; }
+
+  /* ===== التذييل ===== */
+  .corp-foot { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #eef1f6; padding-top: 14px; }
+  .corp-words-qr { margin-top: 12px; text-align: center; }
+  .corp-qr-img { width: 181px; height: 181px; object-fit: contain; border: 1px dashed #c7cede; border-radius: 4px; padding: 2px; }
+  .corp-qr-placeholder { width: 181px; height: 181px; border: 1px dashed #c7cede; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #a7aebb; text-align: center; }
+  .corp-qr-note { font-size: 9.5px; color: #b91c1c; text-align: center; line-height: 1.6; margin-top: 3px; }
+  .corp-foot-notes { flex: 1; font-size: 10.5px; color: #6b7280; line-height: 1.8; }
+  .corp-sign { font-size: 11px; color: #6b7684; text-align: center; }
+  .corp-sign .line { width: 140px; border-top: 1px solid #c7cede; margin: 22px auto 6px; }
+  .corp-bottom { position: absolute; bottom: 6mm; right: 12mm; left: 12mm; z-index: 1; display: flex; justify-content: space-between; border-top: 1.4px solid #fecaca; padding-top: 2.5mm; color: #b91c1c; font-weight: 700; font-size: 11px; }
+  .corp-print-btn { position: fixed; top: 12px; left: 12px; z-index: 99; background: {{ primary }}; color: #fff; border: 0; border-radius: 8px; padding: 9px 20px; font-family: inherit; font-size: 14px; cursor: pointer; }
+  @media print {
+    /* ضمان طباعة الألوان والخلفيات (ومنع اختفاء الباركود) في كل المتصفحات */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff !important; }
+    .corp-doc { margin: 0 auto !important; box-shadow: none !important; width: auto !important; min-height: auto !important; }
+    .corp-print-btn { display: none !important; }
+    /* الباركود الضريبي أسفل المبلغ كتابة — 48مم سهل المسح بكاميرا الجوال حتى بالمرحلة الثانية (85×85 وحدة) */
+    .corp-words-qr { margin-top: 8px !important; text-align: center !important; }
+    .corp-qr-img {
+      display: block !important; margin: 0 auto; visibility: visible !important; opacity: 1 !important;
+      width: 48mm !important; height: 48mm !important; object-fit: contain;
+      background: #fff !important; border: 1px solid #d1d5db !important; border-radius: 4px; padding: 2px;
+      page-break-inside: avoid; break-inside: avoid;
+    }
+  }
+</style>
+</head>
+<body>
+<button class="corp-print-btn" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+<div class="corp-doc">
+  {% if theme.show_watermark %}<div class="corp-watermark"><span>{{ watermark_text }}</span></div>{% endif %}
+  {% if theme.alert_banner_enabled and theme.alert_banner_text %}
+  <div class="corp-alert alert-banner" style="color:{{ theme.alert_banner_color }};background:{{ theme.alert_banner_bg }};border:1.5px solid {{ theme.alert_banner_color }}">⚠ {{ theme.alert_banner_text }}</div>
+  {% endif %}
+<!-- ===== الترويسة: البائع + بيانات الوثيقة ===== -->
+  <div class="corp-header">
+    <div class="corp-seller">
+      {% if company.logo_data_uri %}
+        <img class="corp-logo" src="{{ company.logo_data_uri }}" alt="شعار">
+      {% else %}
+        <div class="corp-logo-fallback">{{ company.name[:1] }}</div>
+      {% endif %}
+      <div style="flex:1">
+        <p class="corp-seller-name">{{ company.name }}</p>
+        <div class="corp-seller-meta">
+          <span class="lbl">الرقم الضريبي:</span> <b>{{ company.tax_number }}</b>
+          {% if company.cr_number %}<span style="color:#c7cede">|</span> <span class="lbl">س.ت:</span> <b>{{ company.cr_number }}</b>{% endif %}
+          <br><span class="lbl">العنوان:</span> {{ company.address }}
+        </div>
+      </div>
+    </div>
+    <div class="corp-badge">
+      <p class="corp-title-ar">{{ doc_title }}</p>
+      <p class="corp-title-en">TAX INVOICE</p>
+      <div class="corp-num-box">
+        <div class="row"><span>رقم الفاتورة</span><span class="val">{{ inv.number }}</span></div>
+        <div class="row"><span>التاريخ</span><span class="val">{{ inv.date_display }}</span></div>
+        <div class="row"><span>الوقت</span><span class="val" dir="ltr">{{ inv.time_display }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== بطاقات الأطراف ===== -->
+  <div class="corp-parties">
+    <div class="corp-party">
+      <h4>بيانات المشتري</h4>
+      <div class="field"><span class="label">الاسم:</span> {{ customer.name }}</div>
+      {% if customer.tax_number %}<div class="field"><span class="label">الرقم الضريبي:</span> {{ customer.tax_number }}</div>{% endif %}
+          {# السجل التجاري يُعرض فقط إذا كان مكتوبًا — ويُخفى تمامًا إذا تُرك فارغًا #}
+          {% if customer.cr_number %}<div class="field"><span class="label">السجل التجاري:</span> {{ customer.cr_number }}</div>{% endif %}
+      {% if customer.address %}<div class="field"><span class="label">العنوان:</span> {{ customer.address }}</div>{% endif %}
+      {% if customer.phone %}<div class="field"><span class="label">الجوال:</span> {{ customer.phone }}</div>{% endif %}
+    </div>
+    <div class="corp-party">
+      <h4>تفاصيل الدفع</h4>
+      <div class="field"><span class="label">طريقة الدفع:</span> {{ inv.payment_type }}</div>
+      <div class="field"><span class="label">وقت الإصدار:</span> <span dir="ltr">{{ inv.time_display }}</span></div>
+      <div class="field"><span class="label">العملة:</span> ريال سعودي (SAR)</div>
+    </div>
+  </div>
+<!-- ===== جدول الأصناف ===== -->
+  <table class="corp-items">
+    <thead>
+      <tr>
+        <th style="width:6%">م</th>
+        <th style="width:32%">الصنف / الوصف</th>
+        <th style="width:9%">الكمية</th>
+        <th style="width:9%">الوحدة</th>
+        <th style="width:12%">سعر الوحدة</th>
+        <th style="width:12%">الصافي</th>
+        <th style="width:10%">الضريبة 15%</th>
+        <th style="width:10%">الإجمالي</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ln in inv.lines %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td class="desc">{{ ln.name }}{% if ln.code %}<div class="corp-code">{{ ln.code }}</div>{% endif %}</td>
+        <td>{{ ln.quantity_display }}</td>
+        <td>{{ ln.unit }}</td>
+        <td>{{ ln.unit_price_display }}</td>
+        <td>{{ ln.line_net_display }}</td>
+        <td>{{ ln.line_tax_display }}</td>
+        <td><b>{{ ln.line_gross_display }}</b></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+<!-- ===== الإجماليات ===== -->
+  <div class="corp-totals-wrap">
+    <div class="corp-words">
+      <span class="label">المبلغ كتابة:</span>
+      {{ inv.total_words }}
+      {# الباركود مثبّت أسفل «المبلغ كتابة» — ولا يظهر إطلاقًا عند اختيار «بدون باركود» #}
+      {% if inv.qr_img %}
+      <div class="corp-words-qr">
+        <img class="corp-qr-img inv-qr" src="{{ inv.qr_img }}" alt="رمز التحقق الضريبي — فاتورة {{ inv.number }}">
+        {% if inv.qr_note %}<div class="corp-qr-note">{{ inv.qr_note }}</div>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="corp-totals">
+      <div class="row"><span>المجموع قبل الضريبة</span><span>{{ inv.subtotal_display }} ر.س</span></div>
+      <div class="row"><span>ضريبة القيمة المضافة (15%)</span><span>{{ inv.tax_display }} ر.س</span></div>
+      <div class="row grand"><span>الإجمالي شامل الضريبة</span><span>{{ inv.total_display }} ر.س</span></div>
+    </div>
+  </div>
+
+  <!-- ===== التذييل: ملاحظات + توقيع ===== -->
+  <div class="corp-foot">
+    <div class="corp-foot-notes">{% if inv.notes %}📝 ملاحظات: {{ inv.notes }}{% endif %}</div>
+    <div class="corp-sign">
+      <div class="line"></div>
+      التوقيع المعتمد
+    </div>
+  </div>
+
+  <div class="corp-bottom">
+    <span>{{ footer_notice }}</span>
+  </div>
+</div>
+</body>
+</html>

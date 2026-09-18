@@ -1,0 +1,538 @@
+{% extends "layout.html" %}
+{% block title %}محرر القالب — {{ tpl.name }}{% endblock %}
+{% block page_title %}🎨 محرر القالب: {{ tpl.name }}{% endblock %}
+{% block actions %}
+<a class="btn ghost" href="{{ url_for('pages.templates_screen') }}">↩ رجوع للقوالب</a>
+<a class="btn ghost" target="_blank" href="{{ url_for('pages.template_preview', tpl_id=tpl.id) }}">👁 معاينة القالب</a>
+<button class="btn" type="button" id="ed-save-btn" onclick="saveCurrent()">💾 حفظ التخصيصات</button>
+{% endblock %}
+{% block content %}
+<div id="tpleditor">
+  <style>
+    /* ═══ محرر القالب — صفحة مستقلة ═══ */
+    #tpleditor .ed-modes{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+    #tpleditor .ed-mode{
+      padding:9px 18px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);
+      cursor:pointer;font-weight:800;font-size:13px;color:inherit;font-family:inherit;transition:.15s;
+    }
+    #tpleditor .ed-mode:hover{border-color:var(--primary);color:var(--primary-dark)}
+    #tpleditor .ed-mode.active{background:var(--primary);border-color:var(--primary);color:#fff}
+    #tpleditor .ed-sec{display:none}
+    #tpleditor .ed-sec.active{display:block}
+    #tpleditor #htmlform textarea.code{min-height:calc(100vh - 380px)}
+    #tpleditor .panel{margin-bottom:0}
+  </style>
+  <div class="summary-strip">
+    🎨 <b>محرر القالب في صفحة مستقلة</b> — كل ما تخصصه هنا يُحفظ مع هذا القالب نفسه
+    («{{ tpl.name }}» — {{ 'فاتورة' if tpl.type == 'invoice' else 'سند' }}) فيُطبق على كل مستند يُطبع به.
+    المعاينة الجانبية تعمل بمحرك الطباعة الفعلي على ورقة A4 حقيقية.
+  </div>
+
+  <div class="ed-modes">
+    <button type="button" class="ed-mode active" data-mode="visual" onclick="setMode('visual')">🎨 المحرر المرئي المتقدم</button>
+    <button type="button" class="ed-mode" data-mode="html" onclick="setMode('html')">✏️ تحرير HTML (Jinja2)</button>
+    <span class="hint" style="margin-inline-start:auto">أي تغيير في المحرر المرئي يُحدِّث المعاينة فورًا — والتغيير لا يُحفظ حتى تضغط «حفظ».</span>
+  </div>
+
+  <!-- ══════════ المحرر المرئي المتقدم (Visual Template Builder) ══════════ -->
+  <section id="ed-visual" class="ed-sec active">
+    <style>
+      #tpleditor .b-wrap{display:flex;gap:14px;align-items:stretch}
+      #tpleditor .b-side{width:360px;flex:0 0 360px;display:flex;flex-direction:column;gap:8px}
+      #tpleditor .b-tabs{display:flex;gap:4px}
+      #tpleditor .b-tabs button{flex:1;padding:8px 2px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;font-weight:700;font-size:11.5px;color:inherit}
+      #tpleditor .b-tabs button.active{background:var(--primary);border-color:var(--primary);color:#fff}
+      #tpleditor .b-pane{display:none;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;height:calc(100vh - 330px);min-height:320px;background:var(--card)}
+      #tpleditor .b-pane.active{display:block}
+      #tpleditor .b-crow{display:flex;gap:8px;align-items:center;margin:8px 0}
+      #tpleditor .b-crow input[type=color]{width:46px;height:30px;padding:2px;border:1px solid var(--line);border-radius:6px;background:#fff;flex:0 0 46px}
+      #tpleditor .b-crow input[type=checkbox]{width:16px;height:16px;flex:0 0 16px}
+      #tpleditor .b-crow label{flex:1;font-size:12.5px;cursor:pointer}
+      #tpleditor .b-field{margin:8px 0}
+      #tpleditor .b-field .f{display:block;margin-bottom:4px}
+      #tpleditor .b-2col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      #tpleditor select,#tpleditor input[type=number]{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
+      #tpleditor textarea{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font-family:inherit;min-height:52px}
+      #tpleditor input[type=range]{width:100%}
+      #tpleditor .b-note{font-size:11.5px;opacity:.8;background:rgba(127,127,127,.12);border-radius:8px;padding:6px 8px;margin-top:8px;line-height:1.7}
+      #tpleditor .b-prev{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+      #tpleditor .b-prev-bar{display:flex;gap:8px;align-items:center;font-size:12.5px;flex-wrap:wrap}
+      #tpleditor .b-prev-box{flex:1;height:calc(100vh - 330px);min-height:320px;overflow:auto;background:#525659;border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;justify-content:center;align-items:flex-start;transition:opacity .2s}
+      #tpleditor .b-holder{overflow:hidden;box-shadow:0 3px 16px rgba(0,0,0,.45);background:#fff;transform-origin:top center;flex:0 0 auto}
+      #tpleditor .b-holder iframe{width:794px;height:1123px;border:0;display:block;background:#fff}
+      #tpleditor .ed-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+    </style>
+    <div class="b-wrap">
+      <div class="b-side">
+        <div class="b-tabs">
+          <button type="button" class="active" data-pane="qr">📍 الباركود</button>
+          <button type="button" data-pane="header">🏢 الهيدر</button>
+          <button type="button" data-pane="table">🧾 الجدول</button>
+          <button type="button" data-pane="party">👤 العميل</button>
+          <button type="button" data-pane="typo">🔤 الألوان</button>
+          <button type="button" data-pane="footer">📄 الذيل</button>
+        </div>
+
+        <div id="bpane-qr" class="b-pane active">
+          <div class="b-field">
+            <label class="f">موضع الباركود (QR) في القالب</label>
+            <select id="b-qr_position">
+              <option value="below_totals">أسفل المبالغ (الافتراضي)</option>
+              <option value="header_top">أعلى الهيدر — وسط</option>
+              <option value="header_side">أعلى الهيدر — جانبي</option>
+              <option value="footer_right">ذيل الورقة — يمين</option>
+              <option value="footer_center">ذيل الورقة — وسط</option>
+              <option value="footer_left">ذيل الورقة — يسار</option>
+              <option value="hidden">إخفاء الباركود</option>
+            </select>
+          </div>
+          <div class="b-field">
+            <label class="f">حجم الباركود: <b><span id="b-qr_size_val">54</span> مم</b> <small>(مثالي للمسح: 50–60)</small></label>
+            <input type="range" id="b-qr_size" min="30" max="80" step="2" value="54">
+          </div>
+          <div class="b-note">💡 المعاينة الجانبية تتحدث فورًا مع كل تغيير — والموضع يُحفظ مع القالب نفسه فتلتزم به كل الفواتير المطبوعة به. يعمل أيضًا على السندات إن احتوت باركود QR.</div>
+        </div>
+
+        <div id="bpane-table" class="b-pane">
+          <div class="b-crow" data-k="th_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#0e7490"><label>خلفية رأس الجدول</label></div>
+          <div class="b-crow" data-k="th_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#ffffff"><label>لون نص رأس الجدول</label></div>
+          <div class="b-crow" data-k="alt_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#f1f5f9"><label>خلفية الصفوف المتبادلة (Zebra)</label></div>
+          <div class="b-crow" data-k="row_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#334155"><label>لون نصوص صفوف البنود</label></div>
+          <div class="b-crow" data-k="border_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#94a3b8"><label>لون حدود الخلايا والمربعات</label></div>
+          <div class="b-2col">
+            <div class="b-field"><label class="f">سمك الحدود (px)</label><input type="number" id="b-border_width" min="0" max="4" step="0.5" placeholder="افتراضي"></div>
+            <div class="b-field"><label class="f">شكل الحدود</label>
+              <select id="b-border_style">
+                <option value="solid">متصل</option>
+                <option value="dashed">متقطع</option>
+                <option value="dotted">منقّط</option>
+                <option value="double">مزدوج</option>
+              </select>
+            </div>
+          </div>
+          <div class="b-2col">
+            <div class="b-field"><label class="f">تباعد داخل الخلايا (px)</label><input type="number" id="b-cell_padding" min="0" max="16" placeholder="افتراضي"></div>
+            <div class="b-field"><label class="f">حجم خط رأس الجدول (px)</label><input type="number" id="b-th_size" min="8" max="24" placeholder="افتراضي"></div>
+          </div>
+          <div class="check" style="margin-top:10px"><input type="checkbox" id="b-th_bold"><label for="b-th_bold">رأس الجدول بخط غامق (Bold)</label></div>
+        </div>
+
+        <div id="bpane-typo" class="b-pane">
+          <div class="b-note" style="margin:0 0 8px">فعّل ☑ بجانب اللون لتخصيصه — وإلا يبقى لون القالب الأصلي.</div>
+          <b style="font-size:12.5px">عناوين المستند</b>
+          <div class="b-crow" data-k="header_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#0e7490"><label>لون العناوين</label></div>
+          <div class="b-2col">
+            <div class="b-field"><label class="f">حجم العنوان (px)</label><input type="number" id="b-header_size" min="10" max="40" placeholder="افتراضي"></div>
+            <div class="b-field"><label class="f">&nbsp;</label><div class="check"><input type="checkbox" id="b-header_bold"><label for="b-header_bold">عناوين غامقة</label></div></div>
+          </div>
+          <b style="font-size:12.5px">نص الفاتورة</b>
+          <div class="b-crow" data-k="body_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#1f2937"><label>لون النصوص</label></div>
+          <div class="b-field"><label class="f">حجم النصوص (px)</label><input type="number" id="b-body_size" min="8" max="20" placeholder="افتراضي"></div>
+          <b style="font-size:12.5px">المبالغ الإجمالية</b>
+          <div class="b-crow" data-k="total_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#b91c1c"><label>لون الإجماليات</label></div>
+          <div class="b-2col">
+            <div class="b-field"><label class="f">حجم الإجماليات (px)</label><input type="number" id="b-total_size" min="8" max="30" placeholder="افتراضي"></div>
+            <div class="b-field"><label class="f">&nbsp;</label><div class="check"><input type="checkbox" id="b-total_bold"><label for="b-total_bold">إجماليات غامقة</label></div></div>
+          </div>
+        </div>
+
+        <div id="bpane-header" class="b-pane">
+          <div class="b-note" style="margin:0 0 8px">تُطبَّق على ترويسة البائع في الفواتير والسندات — تخصيص كامل لكل شركة على حدة (كل قالب يحفظ إعداداته الخاصة).</div>
+          <b style="font-size:12.5px">الشعار (Logo)</b>
+          <div class="b-2col">
+            <div class="b-field"><label class="f">حجم الشعار (مم)</label><input type="number" id="b-logo_size" min="6" max="60" placeholder="افتراضي"></div>
+            <div class="b-field"><label class="f">محاذاة الشعار</label>
+              <select id="b-logo_align">
+                <option value="">حسب القالب</option>
+                <option value="right">يمين</option>
+                <option value="center">وسط</option>
+                <option value="left">يسار</option>
+              </select>
+            </div>
+          </div>
+          <div class="check" style="margin:6px 0 10px"><input type="checkbox" id="b-show_logo"><label for="b-show_logo">إخفاء الشعار (يظهر الحرف البديل)</label></div>
+          <b style="font-size:12.5px">بيانات الشركة</b>
+          <div class="b-crow" data-k="header_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#f8fafc"><label>خلفية شريط الهيدر</label></div>
+          <div class="b-crow" data-k="company_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#0e7490"><label>لون اسم الشركة</label></div>
+          <div class="b-field"><label class="f">حجم اسم الشركة (px)</label><input type="number" id="b-company_size" min="8" max="44" placeholder="افتراضي"></div>
+          <div class="b-crow" data-k="meta_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#4b5563"><label>لون بيانات الشركة (ضريبي/سجل/عنوان)</label></div>
+          <div class="b-field"><label class="f">حجم بيانات الشركة (px)</label><input type="number" id="b-meta_size" min="7" max="20" placeholder="افتراضي"></div>
+          <b style="font-size:12.5px">إظهار/إخفاء بيانات البائع</b>
+          <div class="check"><input type="checkbox" id="b-show_company_tax"><label for="b-show_company_tax">إخفاء الرقم الضريبي للشركة</label></div>
+          <div class="check"><input type="checkbox" id="b-show_company_cr"><label for="b-show_company_cr">إخفاء السجل التجاري للشركة</label></div>
+          <div class="check"><input type="checkbox" id="b-show_company_addr"><label for="b-show_company_addr">إخفاء عنوان الشركة</label></div>
+        </div>
+
+        <div id="bpane-party" class="b-pane">
+          <b style="font-size:12.5px">عنوان المستند (فاتورة / سند)</b>
+          <div class="b-crow" data-k="title_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#0e7490"><label>لون عنوان المستند</label></div>
+          <div class="b-field"><label class="f">حجم عنوان المستند (px)</label><input type="number" id="b-title_size" min="10" max="44" placeholder="افتراضي"></div>
+          <b style="font-size:12.5px">بطاقة العميل / الجهة المستفيدة</b>
+          <div class="b-crow" data-k="cust_card_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#f8fafc"><label>خلفية بطاقة العميل</label></div>
+          <div class="b-crow" data-k="cust_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#374151"><label>لون نصوص بطاقة العميل</label></div>
+          <b style="font-size:12.5px">إظهار/إخفاء بيانات المشتري</b>
+          <div class="check"><input type="checkbox" id="b-show_cust_tax"><label for="b-show_cust_tax">إخفاء الرقم الضريبي للعميل</label></div>
+          <div class="check"><input type="checkbox" id="b-show_cust_cr"><label for="b-show_cust_cr">إخفاء السجل التجاري للعميل</label></div>
+          <div class="check"><input type="checkbox" id="b-show_cust_addr"><label for="b-show_cust_addr">إخفاء عنوان العميل</label></div>
+          <div class="check"><input type="checkbox" id="b-show_cust_phone"><label for="b-show_cust_phone">إخفاء جوال العميل</label></div>
+          <div class="b-note">📌 بيانات العميل (ومنها السجل التجاري) تظهر تلقائيًا فور توفر قيمتها وتُخفى إذا كان الحقل فارغًا — ومن هنا يمكنك إخفاءها حتى لو كانت مكتوبة.</div>
+        </div>
+
+        <div id="bpane-footer" class="b-pane">
+          <b style="font-size:12.5px">صندوق المبالغ</b>
+          <div class="b-crow" data-k="total_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#0e7490"><label>خلفية صف الإجمالي النهائي</label></div>
+          <div class="b-crow" data-k="total_label_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#f1f5f9"><label>خلفية خلايا تسميات المبالغ</label></div>
+          <b style="font-size:12.5px">ذيل المستند (Footer)</b>
+          <div class="check" style="margin:6px 0 10px"><input type="checkbox" id="b-show_footer"><label for="b-show_footer">إخفاء تذييل القالب (التنبيه السفلي)</label></div>
+          <label class="f">نص تذييل مخصص <small>(يُطبع أسفل كل فاتورة/سند بهذا القالب)</small></label>
+          <textarea id="b-footer_text" rows="2" placeholder="مثال: يُرجى مراجعة الفاتورة والبضاعة عند الاستلام…"></textarea>
+          <div class="b-crow" data-k="footer_bg"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#f8fafc"><label>خلفية التذييل المخصص</label></div>
+          <div class="b-crow" data-k="footer_color"><input type="checkbox" class="b-use"><input type="color" class="b-color" value="#334155"><label>لون نص التذييل</label></div>
+          <div class="b-field"><label class="f">حجم خط التذييل (px)</label><input type="number" id="b-footer_size" min="7" max="20" placeholder="افتراضي"></div>
+          <b style="font-size:12.5px">شروط الطباعة</b>
+          <label class="f">نص الشروط <small>(يُطبع أعلى التذييل عند تعبئته)</small></label>
+          <textarea id="b-terms_text" rows="2" placeholder="مثال: البضاعة المباعة لا تُرد ولا تُستبدل بعد 7 أيام…"></textarea>
+        </div>
+      </div>
+
+      <div class="b-prev">
+        <div class="b-prev-bar">
+          <b>🖨 معاينة الطباعة (ورقة A4 حقيقية)</b>
+          <button class="btn sm ghost" type="button" onclick="builderRefresh()">↻ تحديث المعاينة</button>
+          <button class="btn sm ghost" type="button" onclick="builderPrint()">🖨 طباعة</button>
+          <div class="check" style="margin:0"><input type="checkbox" id="b-auto" checked><label for="b-auto" style="font-size:12.5px;font-weight:700">تحديث تلقائي</label></div>
+          <span class="hint" style="margin-inline-start:auto">نفس محرك الطباعة الفعلي تمامًا</span>
+        </div>
+        <div id="b-prev-box" class="b-prev-box">
+          <div id="b-holder" class="b-holder"><iframe id="b-frame" title="معاينة القالب"></iframe></div>
+        </div>
+      </div>
+    </div>
+    <div class="ed-bar">
+      <button class="btn" type="button" onclick="builderSave()">💾 حفظ التخصيصات</button>
+      <button class="btn amber-ghost" type="button" onclick="builderResetAll()"> إرجاع الافتراضي</button>
+      <a class="btn ghost" href="{{ url_for('pages.templates_screen') }}">↩ رجوع للقوالب</a>
+      <span class="hint" style="flex:1;min-width:220px">تنبيه: التغييرات غير المحفوظة تُفقد عند مغادرة الصفحة — اضغط «حفظ التخصيصات» أولًا.</span>
+    </div>
+  </section>
+
+  <!-- ══════════ تحرير HTML الكامل (Jinja2) ══════════ -->
+  <section id="ed-html" class="ed-sec">
+    <div class="panel">
+      <h2>✏️ تحرير HTML الكامل للقالب</h2>
+      <form id="htmlform" onsubmit="return false">
+        <input type="hidden" name="id" value="{{ tpl.id }}">
+        <div class="grid2">
+          <div><label class="f">اسم القالب *</label><input type="text" name="name" value="{{ tpl.name }}" required></div>
+          <div>
+            <label class="f">النوع *</label>
+            <select name="type">
+              <option value="invoice" {{ 'selected' if tpl.type == 'invoice' }}>فاتورة</option>
+              <option value="receipt" {{ 'selected' if tpl.type == 'receipt' }}>سند</option>
+            </select>
+          </div>
+        </div>
+        <label class="f">محتوى HTML (Jinja2)</label>
+        <textarea class="code" name="html_content" spellcheck="false">{{ tpl.html_content }}</textarea>
+        <div class="hint">⚠ القالب يُستخدم كما هو — تأكد من صحة HTML قبل الحفظ. إعدادات المحرر المرئي تُحفظ كتعليق <code>&lt;!--TPL_STYLE:…--&gt;</code> في أول ملف القالب، فاحتفظ به إن أردت بقاء تخصيصاتك. زر «استعادة الافتراضي» يعيد القالب الأصلي (ويُلغي التخصيصات).</div>
+        <div class="dlg-actions">
+          <button class="btn" type="submit">💾 حفظ المحتوى</button>
+          <button class="btn amber-ghost" type="button" onclick="resetTpl()">↺ استعادة الافتراضي</button>
+          <a class="btn ghost" href="{{ url_for('pages.templates_screen') }}">↩ رجوع للقوالب</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// ══════════ بيانات الصفحة ══════════
+const B_TID = {{ tpl.id }};
+const ED_MODE = {{ mode | tojson }};
+let edMode = ED_MODE;
+
+const B_COLORS = ['th_bg', 'th_color', 'alt_bg', 'border_color', 'header_color', 'body_color', 'total_color',
+  'header_bg', 'company_color', 'meta_color', 'title_color', 'cust_card_bg', 'cust_color', 'row_color',
+  'total_bg', 'total_label_bg', 'footer_bg', 'footer_color'];
+const B_NUMS = ['th_size', 'border_width', 'cell_padding', 'header_size', 'body_size', 'total_size',
+  'logo_size', 'company_size', 'meta_size', 'title_size', 'footer_size'];
+const B_FLAGS = ['th_bold', 'header_bold', 'total_bold',
+  'show_logo', 'show_company_tax', 'show_company_cr', 'show_company_addr',
+  'show_cust_tax', 'show_cust_cr', 'show_cust_addr', 'show_cust_phone', 'show_footer'];
+const B_SELECTS = ['logo_align'];
+const B_TEXTS = ['footer_text', 'terms_text'];
+let bTimer = null, bLastHtml = '', htmlDirty = false;
+
+// ── مساعدات آمنة: تتحقق من وجود الحقل قبل التعيين فلا يتوقف السكربت أبدًا ──
+function bEl(k) { return document.getElementById('b-' + k); }
+function bSet(k, v) {
+  const el = bEl(k);
+  if (!el) { console.warn('المحرر المرئي: الحقل #b-' + k + ' غير موجود في الصفحة — تم تجاهله'); return; }
+  el.value = v;
+}
+function bCheck(k, v) {
+  const el = bEl(k);
+  if (!el) { console.warn('المحرر المرئي: الحقل #b-' + k + ' غير موجود في الصفحة — تم تجاهله'); return; }
+  el.checked = !!v;
+}
+function bRowInputs(row) {
+  return { use: row.querySelector('.b-use'), color: row.querySelector('.b-color') };
+}
+function builderAuto() {
+  const c = document.getElementById('b-auto');
+  return !c || c.checked;   // التحديث التلقائي مفعّل افتراضيًا
+}
+
+function builderResetFields() {
+  bSet('qr_position', 'below_totals');
+  bSet('qr_size', 54);
+  const qsv = document.getElementById('b-qr_size_val');
+  if (qsv) qsv.textContent = '54';
+  for (const k of B_NUMS) bSet(k, '');
+  for (const k of B_FLAGS) bCheck(k, false);
+  bSet('border_style', 'solid');
+  for (const k of B_SELECTS) bSet(k, '');
+  for (const k of B_TEXTS) bSet(k, '');
+  for (const row of document.querySelectorAll('#tpleditor .b-crow')) {
+    const { use, color } = bRowInputs(row);
+    if (use) use.checked = false;
+    if (color) color.value = '#0e7490';
+  }
+}
+
+function builderApply(s) {
+  s = s || {};
+  const gp = bEl('qr_position');
+  if (gp) {
+    gp.value = s.qr_position || 'below_totals';
+    if (gp.selectedIndex < 0) gp.value = 'below_totals';
+  }
+  bSet('qr_size', s.qr_size || 54);
+  const qsv = document.getElementById('b-qr_size_val');
+  const qs = bEl('qr_size');
+  if (qsv && qs) qsv.textContent = qs.value;
+  for (const k of B_NUMS) bSet(k, s[k] || '');
+  for (const k of B_FLAGS) bCheck(k, s[k] === '1');
+  const bs = bEl('border_style');
+  if (bs) {
+    bs.value = s.border_style || 'solid';
+    if (bs.selectedIndex < 0) bs.value = 'solid';
+  }
+  for (const k of B_SELECTS) {
+    const el = bEl(k);
+    if (!el) continue;
+    el.value = s[k] || '';
+    if (el.selectedIndex < 0) el.value = '';
+  }
+  for (const k of B_TEXTS) bSet(k, s[k] || '');
+  for (const row of document.querySelectorAll('#tpleditor .b-crow')) {
+    const { use, color } = bRowInputs(row);
+    if (!use || !color) continue;
+    const k = row.dataset.k, v = (s[k] || '').trim();
+    use.checked = !!v;
+    if (v) color.value = v;
+  }
+}
+
+function builderStyle() {
+  const s = {
+    qr_position: (bEl('qr_position') || {}).value || 'below_totals',
+    qr_size: (bEl('qr_size') || {}).value || '54',
+    border_style: (bEl('border_style') || {}).value || 'solid',
+  };
+  for (const k of B_NUMS) {
+    const el = bEl(k);
+    if (el) s[k] = el.value;
+  }
+  for (const k of B_FLAGS) {
+    const el = bEl(k);
+    if (el) s[k] = el.checked ? '1' : '';
+  }
+  for (const k of B_SELECTS) {
+    const el = bEl(k);
+    if (el) s[k] = el.value;
+  }
+  for (const k of B_TEXTS) {
+    const el = bEl(k);
+    if (el) s[k] = el.value.trim();
+  }
+  for (const row of document.querySelectorAll('#tpleditor .b-crow')) {
+    const { use, color } = bRowInputs(row);
+    if (!use || !color) continue;
+    s[row.dataset.k] = use.checked ? color.value : '';
+  }
+  return s;
+}
+
+// ── المعاينة الحية (بنفس محرك الطباعة الفعلي) ──
+async function builderRefresh() {
+  const box = document.getElementById('b-prev-box');
+  const frame = document.getElementById('b-frame');
+  if (!box || !frame) { console.warn('المحرر المرئي: صندوق المعاينة غير موجود'); return; }
+  box.style.opacity = '.55';
+  try {
+    const j = await api('/api/templates/' + B_TID + '/live-preview', { style: builderStyle() });
+    if (!j.ok) throw new Error(j.error || 'خطأ في المعاينة');
+    bLastHtml = j.html;
+    frame.srcdoc = j.html;
+  } catch (e) { toast(e.message, true); }
+  finally { box.style.opacity = ''; }
+}
+
+function builderQueue() {
+  if (!builderAuto()) return;                 // التحديث التلقائي متوقف — استخدم زر «تحديث المعاينة»
+  clearTimeout(bTimer);
+  bTimer = setTimeout(builderRefresh, 400);
+}
+
+async function builderSave() {
+  try {
+    const j = await api('/api/templates/' + B_TID + '/style', { style: builderStyle() });
+    if (!j.ok) throw new Error(j.error || 'خطأ في الحفظ');
+    toast('✅ تم حفظ تخصيصات القالب — تُطبق على كل الفواتير المطبوعة به');
+    builderRefresh();
+  } catch (e) { toast(e.message, true); }
+}
+
+function builderResetAll() {
+  confirmThen('إرجاع كل التخصيصات إلى الوضع الافتراضي؟ (التغيير لا يُحفظ حتى تضغط «حفظ التخصيصات»)', () => {
+    builderResetFields();
+    builderQueue();
+  });
+}
+
+function builderPrint() {
+  if (!bLastHtml) { toast('لا توجد معاينة للطباعة بعد', true); return; }
+  const w = window.open('', '_blank');
+  if (!w) { toast('منع المتصفح فتح نافذة الطباعة', true); return; }
+  w.document.open(); w.document.write(bLastHtml); w.document.close();
+  w.addEventListener('load', () => setTimeout(() => w.print(), 400));
+}
+
+// ملاءمة ورقة A4 (794×1123px عند 96dpi) داخل صندوق المعاينة
+function bFit() {
+  const box = document.getElementById('b-prev-box'), hold = document.getElementById('b-holder');
+  if (!box || !hold) return;
+  const s = Math.min(1, (box.clientWidth - 24) / 794);
+  hold.style.transform = 'scale(' + s + ')';
+  hold.style.width = (794 * s) + 'px';
+  hold.style.height = (1123 * s) + 'px';
+}
+
+// ── تهيئة المحرر المرئي: قراءة إعدادات القالب من السيرفر ثم معاينة ──
+async function builderInit() {
+  builderResetFields();
+  bFit();
+  try {
+    const j = await api('/api/templates/' + B_TID + '/style');
+    if (!j.ok) throw new Error(j.error || 'خطأ في قراءة الإعدادات');
+    builderApply(j.style || {});
+  } catch (e) { toast(e.message, true); }
+  builderRefresh();
+}
+
+// ══════════ التبديل بين المحرر المرئي وتحرير HTML ══════════
+function syncUrl(m) {
+  // نُبقي تبويب HTML في العنوان حتى لا يُفقد بعد إعادة التحميل عند الحفظ
+  const url = location.pathname + (m === 'html' ? '?tab=html' : '');
+  try { history.replaceState(null, '', url); } catch (e) { /* ignore */ }
+}
+
+function setMode(m) {
+  edMode = (m === 'html') ? 'html' : 'visual';
+  document.querySelectorAll('#tpleditor .ed-mode').forEach(
+    b => b.classList.toggle('active', b.dataset.mode === edMode));
+  document.querySelectorAll('#tpleditor .ed-sec').forEach(s => s.classList.remove('active'));
+  const sec = document.getElementById('ed-' + edMode);
+  if (sec) sec.classList.add('active');
+  const sb = document.getElementById('ed-save-btn');
+  if (sb) sb.textContent = (edMode === 'html') ? '💾 حفظ المحتوى' : '💾 حفظ التخصيصات';
+  syncUrl(edMode);
+  if (edMode === 'visual') setTimeout(bFit, 60);
+  else htmlLoad(false);
+}
+
+// زر الحفظ العلوي: يحفظ حسب التبويب المفتوح
+function saveCurrent() {
+  if (edMode === 'html') htmlSave();
+  else builderSave();
+}
+
+// ── تحرير HTML: الجلب من السيرفر (لا يُفقد ما كتبته غير المحفوظ) ──
+async function htmlLoad(force) {
+  if (htmlDirty && !force) return;
+  const f = document.getElementById('htmlform');
+  if (!f) return;
+  try {
+    const j = await api('/api/templates/' + B_TID + '/get');
+    if (!j.ok) throw new Error(j.error || 'خطأ في قراءة القالب');
+    f.querySelector('[name=name]').value = j.row.name;
+    f.querySelector('[name=type]').value = j.row.type;
+    f.querySelector('[name=html_content]').value = j.row.html_content;
+    htmlDirty = false;
+  } catch (e) { toast(e.message, true); }
+}
+
+function htmlSave() {
+  const f = document.getElementById('htmlform');
+  if (!f) return;
+  syncUrl('html');   // نبقى على تبويب HTML بعد إعادة تحميل الصفحة
+  submitModal(f, '/api/templates');   // يحفظ ثم يُحدّث الصفحة (submitModal من app.js)
+}
+
+function resetTpl() {
+  confirmThen('استعادة المحتوى الافتراضي لهذا القالب؟ (يُفقد المحتوى الحالي مع تخصيصات المحرر المرئي)', async () => {
+    try {
+      await api('/api/templates/' + B_TID + '/reset', {});
+      toast('تمت الاستعادة');
+      setTimeout(() => location.reload(), 350);
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+// ══════════ ربط عناصر التحكم ══════════
+const edRoot = document.getElementById('tpleditor');
+if (edRoot) {
+  // أي تغيير في المحرر المرئي ⇒ تحديث فوري (مؤجَّل 400ms) للمعاينة
+  edRoot.addEventListener('input', e => {
+    if (e.target.closest('#ed-visual')) {
+      if (e.target.id === 'b-qr_size') {
+        const qsv = document.getElementById('b-qr_size_val');
+        if (qsv) qsv.textContent = e.target.value;
+      }
+      builderQueue();
+    } else if (e.target.name === 'html_content') {
+      htmlDirty = true;   // تعديل غير محفوظ في تبويب HTML
+    }
+  });
+  edRoot.addEventListener('change', e => {
+    if (e.target.closest('#ed-visual') && e.target.id !== 'b-auto') builderQueue();
+  });
+} else {
+  console.error('محرر القالب: الحاوية #tpleditor غير موجودة');
+}
+
+// تبويبات لوحة التحكم (الباركود/الهيدر/…)
+document.querySelectorAll('#tpleditor .b-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tpleditor .b-tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#tpleditor .b-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const pane = document.getElementById('bpane-' + btn.dataset.pane);
+    if (pane) pane.classList.add('active');
+  });
+});
+
+const bFrameEl = document.getElementById('b-frame');
+if (bFrameEl) bFrameEl.addEventListener('load', bFit);
+window.addEventListener('resize', () => {
+  const vis = document.getElementById('ed-visual');
+  if (vis && vis.classList.contains('active')) bFit();
+});
+
+// ── بدء التشغيل ──
+setMode(ED_MODE);
+if (edMode === 'visual') builderInit();
+</script>
+{% endblock %}

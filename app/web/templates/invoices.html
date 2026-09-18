@@ -1,0 +1,644 @@
+{% extends "layout.html" %}
+{% block title %}الفواتير الناتجة — {{ APP_NAME }}{% endblock %}
+{% block page_title %}الفواتير الناتجة{% endblock %}
+{% block actions %}<button class="btn green" onclick="exportDocs('combined', this)">📄 تصدير PDF واحد</button>
+<button class="btn" onclick="exportDocs('zip', this)">🗂 تصدير منفصل ZIP</button>
+<button class="btn ghost" onclick="printSelected(this)">🖨️ طباعة المحددة</button>{% endblock %}
+{% block content %}
+{% macro page_url(p) -%}
+/invoices?{% for k, v in request.args.items(multi=True) if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endfor %}page={{ p }}
+{%- endmacro %}
+{% macro batch_page_url(p) -%}
+/invoices?{% for k, v in request.args.items(multi=True) if k != 'b_page' and k != 'b_per_page' %}{{ k }}={{ v|urlencode }}&{% endfor %}b_page={{ p }}
+{%- endmacro %}
+<form class="panel" method="get" action="/invoices">
+  <h2>🔎 تصفية</h2>
+  <div class="filters">
+    <div>
+      <label class="f">الدفعة</label>
+      <select name="batch_id" onchange="this.form.submit()">
+        <option value="">كل الدفعات</option>
+        {% for b in batches %}
+        <option value="{{ b.id }}" {{ 'selected' if f_batch|string == b.id|string }}>دفعة #{{ b.id }} — {{ b.created_at[:10] }} ({{ b.invoice_count }} فاتورة)</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label class="f">بحث (رقم / عميل)</label><input type="text" name="q" value="{{ f_q }}"></div>
+    <div><label class="f">من تاريخ</label><input type="date" name="date_from" value="{{ f_from }}"></div>
+    <div><label class="f">إلى تاريخ</label><input type="date" name="date_to" value="{{ f_to }}"></div>
+    <div style="flex:0"><button class="btn" type="submit">تطبيق</button></div>
+  </div>
+</form>
+
+<div class="summary-strip">
+  📊 النتائج: <b>{{ total_count }}</b> فاتورة{% if pages > 1 %} — صفحة <b>{{ page }}</b> من <b>{{ pages }}</b>{% endif %} —
+  إجمالي شامل الضريبة: <b>{{ total_gross|sar }} ر.س</b>
+</div>
+
+<div class="panel">
+  <h2>📄 الدفعات</h2>
+  {% if batch_rows %}
+  <table class="tbl">
+    <thead><tr><th>#</th><th>التاريخ</th><th>اسم البائع</th><th>اسم المشتري / العميل</th><th>الفواتير</th><th class="num">الصافي</th><th class="num">الضريبة</th><th class="num">الإجمالي</th><th>البذرة</th><th></th></tr></thead>
+    <tbody>
+      {% for b in batch_rows %}
+      {% set buyers = (b.buyer_names or '').split('، ') | reject('equalto', '') | list %}
+      <tr>
+        <td title="انقر للتظليل — النقر على خلية أخرى ينقل التظليل إليها فورًا"><b>{{ b.id }}</b></td>
+        <td>{{ b.created_at[:16] }}</td>
+        <td><span class="seller-name" title="انقر لتظليل الاسم — النقر على قسم آخر ينقل التظليل إليه فورًا">{{ b.company_name or '—' }}</span></td>
+        <td title="{{ b.buyer_names or '' }}">
+          {% if buyers %}
+          <span class="buyer-name">🧍 {{ buyers[0] }}{% if buyers|length > 1 %} <span class="badge amber" title="{{ buyers|join('، ') }}">+{{ buyers|length - 1 }}</span>{% endif %}</span>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>{{ b.invoice_count }}</td>
+        <td class="num">{{ b.total_net|sar }}</td>
+        <td class="num">{{ b.total_tax|sar }}</td>
+        <td class="num"><b>{{ b.total_gross|sar }}</b></td>
+        <td><span class="badge blue">{{ b.seed or '—' }}</span></td>
+        <td style="white-space:nowrap">
+          <a class="btn sm ghost" href="/invoices?batch_id={{ b.id }}">عرض</a>
+          <button class="btn sm" onclick="openReportDlg({{ b.id }})">📄 تقرير</button>
+          <button class="btn sm ghost" onclick="openTemplateDlg({{ b.id }})">🎨 اختيار القالب</button>
+          <button class="btn sm red" onclick="deleteRow('batches', {{ b.id }}, 'الدفعة (مع كل فواتيرها وسنداتها)')">🗑 حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if b_pages > 1 %}
+  {% set bns = namespace(prev=0) %}
+  <div class="pager">
+    <span class="pg-info">عرض {{ batch_rows|length }} من {{ b_total }} دفعة</span>
+    <div class="pg-btns">
+      {% if b_page > 1 %}<a class="pg nav" href="{{ batch_page_url(b_page - 1) }}">‹ السابق</a>{% endif %}
+      {% for p in range(1, b_pages + 1) %}
+        {% if p == 1 or p == b_pages or (b_page - 2) <= p <= (b_page + 2) %}
+          {% if bns.prev and p - bns.prev > 1 %}<span class="pg dots">…</span>{% endif %}
+          {% set bns.prev = p %}
+          {% if p == b_page %}<span class="pg cur">{{ p }}</span>{% else %}<a class="pg" href="{{ batch_page_url(p) }}">{{ p }}</a>{% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if b_page < b_pages %}<a class="pg nav" href="{{ batch_page_url(b_page + 1) }}">التالي ›</a>{% endif %}
+    </div>
+    <span class="pg-info">دفعات بالصفحة:</span>
+    <select onchange="setBPerPage(this.value)">
+      {% for n in [10, 25, 50] %}
+      <option value="{{ n }}" {{ 'selected' if b_per_page == n }}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% else %}<div class="empty">لا توجد دفعات — ابدأ من شاشة التوليد</div>{% endif %}
+</div>
+
+<div class="panel">
+  <h2>🧾 الفواتير</h2>
+  {% if rows %}
+  <div class="bulkbar">
+    <b>⚡ تطبيق جماعي للقالب</b>
+    <span class="pg-info" id="bulkCount">لم تُحدَّد أي فاتورة</span>
+    {% if invoice_templates %}
+    <select id="bulkTplSelect" onchange="updateBulkState()">
+      {% for t in invoice_templates %}
+      <option value="{{ t.id }}">{{ t.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn green sm" id="bulkApplyBtn" disabled onclick="applyBulkTemplate(this)">💾 تفعيل وتطبيق على المحدد</button>
+    <span class="hint" style="margin-top:0">حدّد الفواتير ☑ ثم اختر القالب وفعّله — يُطبَّق تلقائيًا على كل الفواتير المختارة</span>
+    {% else %}
+    <span class="muted">لا توجد قوالب فواتير — أضفها من شاشة القوالب أولًا</span>
+    {% endif %}
+  </div>
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="selAll" title="تحديد الكل"></th><th>الرقم</th><th>التاريخ</th><th>الوقت</th><th>العميل</th><th>اسم البائع</th><th>الشركة</th>
+        <th>النوع</th><th>الدفع</th><th class="num">الصافي</th><th class="num">الضريبة</th><th class="num">الإجمالي</th>
+        <th>QR</th><th>سند</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-id="{{ r.id }}">
+        <td><input type="checkbox" class="sel" value="{{ r.id }}" onchange="togglePrintBtn(); updateBulkState()"></td>
+        <td><b>{{ r.invoice_number }}</b></td>
+        <td>{{ r.invoice_date|adate }}</td>
+        <td class="muted">{{ r.invoice_time[:5] }}</td>
+        <td>{{ r.customer_name }}</td>
+        <td><span class="seller-name" title="انقر لتظليل الاسم — النقر على قسم آخر ينقل التظليل إليه فورًا">{{ r.company_name }}</span></td>
+        <td class="muted" title="انقر للتظليل — النقر على خلية أخرى ينقل التظليل إليها فورًا">{{ r.company_name }}</td>
+        <td>{% if r.is_manual %}<span class="badge {{ 'amber' if r.approval_status == 'draft' else 'green' }}">{{ 'يدوية · مسودة' if r.approval_status == 'draft' else 'يدوية · معتمدة' }}</span>{% else %}—{% endif %}</td>
+        <td><span class="badge {{ 'green' if r.payment_type == 'نقدي' else 'blue' if r.payment_type == 'آجل' else 'amber' }}">{{ r.payment_type }}</span></td>
+        <td class="num">{{ r.subtotal|sar }}</td>
+        <td class="num">{{ r.tax_amount|sar }}</td>
+        <td class="num"><b>{{ r.total_amount|sar }}</b></td>
+        <td>{% if r.qr_payload_b64 %}<span class="badge blue">{{ 'P2' if r.qr_mode == 'phase2' else '✓' }}</span>{% else %}—{% endif %}</td>
+        <td>{% if r.receipts_count %}<a href="/receipts?batch_id={{ r.batch_id }}" title="يوجد {{ r.receipts_count }} سند مرافق">🧾 {{ r.receipts_count }}</a>{% else %}—{% endif %}</td>
+        <td style="white-space:nowrap">
+          <a class="btn sm" target="_blank" href="/invoices/{{ r.id }}/preview">👁 معاينة</a>
+          {% if r.qr_payload_b64 %}<a class="btn sm ghost" target="_blank" href="/verify/{{ r.id }}">🔎 فحص QR</a>{% endif %}
+          <button class="btn sm ghost" onclick="exportOne({{ r.id }}, this)">📄 PDF</button>
+          <button class="btn sm ghost" onclick="openEditDlg({{ r.id }})">✏️ تحرير</button>
+          <button class="btn sm red" onclick="deleteRow('invoices', {{ r.id }}, 'الفاتورة')">🗑</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if pages > 1 %}
+  {% set ns = namespace(prev=0) %}
+  <div class="pager">
+    <span class="pg-info">عرض {{ rows|length }} من {{ total_count }} فاتورة</span>
+    <div class="pg-btns">
+      {% if page > 1 %}<a class="pg nav" href="{{ page_url(page - 1) }}">‹ السابق</a>{% endif %}
+      {% for p in range(1, pages + 1) %}
+        {% if p == 1 or p == pages or (page - 2) <= p <= (page + 2) %}
+          {% if ns.prev and p - ns.prev > 1 %}<span class="pg dots">…</span>{% endif %}
+          {% set ns.prev = p %}
+          {% if p == page %}<span class="pg cur">{{ p }}</span>{% else %}<a class="pg" href="{{ page_url(p) }}">{{ p }}</a>{% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if page < pages %}<a class="pg nav" href="{{ page_url(page + 1) }}">التالي ›</a>{% endif %}
+    </div>
+    <span class="pg-info">صفوف بالصفحة:</span>
+    <select onchange="setPerPage(this.value)">
+      {% for n in [25, 50, 100, 200] %}
+      <option value="{{ n }}" {{ 'selected' if per_page == n }}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% else %}<div class="empty">لا توجد فواتير مطابقة</div>{% endif %}
+</div>
+
+<dialog id="dlgReport">
+  <h3>📄 تقرير الدفعة #<span id="repBatchNo"></span></h3>
+  <p class="muted" style="margin-bottom:10px">
+    يحتوي التقرير: البائع، المشتري، الحساب، التاريخ، الوقت، رقم الفاتورة،
+    طريقة السداد، قيمة الضريبة المضافة، المبلغ الشامل.
+  </p>
+  <div class="dlg-actions">
+    <button class="btn green" onclick="downloadBatchReport('xlsx')">📊 طباعة Excel</button>
+    <button class="btn red" onclick="downloadBatchReport('pdf')">📄 طباعة PDF</button>
+    <button class="btn ghost" type="button" onclick="closeDlg('dlgReport')">إلغاء</button>
+  </div>
+</dialog>
+
+<dialog id="dlgTemplate">
+  <h3>🎨 اختيار قالب الفواتير — الدفعة #<span id="tplBatchNo"></span></h3>
+  <p class="muted" style="margin-bottom:10px">
+    سيُطبَّق القالب المختار على <b>كل فواتير هذه الدفعة</b> (المجموعة كاملة) فورًا.
+  </p>
+  <label class="f">القالب</label>
+  <select id="tplSelect">
+    {% if invoice_templates %}
+    {% for t in invoice_templates %}
+    <option value="{{ t.id }}">{{ t.name }}</option>
+    {% endfor %}
+    {% else %}
+    <option value="">لا توجد قوالب فواتير — أضفها من شاشة القوالب</option>
+    {% endif %}
+  </select>
+  <div class="dlg-actions">
+    <button class="btn" onclick="applyBatchTemplate()">💾 تطبيق على الدفعة</button>
+    <button class="btn ghost" type="button" onclick="closeDlg('dlgTemplate')">إلغاء</button>
+  </div>
+</dialog>
+
+<dialog id="dlgEdit" class="xl">
+  <h3>✏️ تحرير الفاتورة <span id="edNum" dir="ltr"></span></h3>
+  <p class="muted" style="margin-bottom:10px">
+    🔒 تحرير محمي بكلمة سر التحكم — يحق للمشرف فقط. عند الحفظ تُحدَّث المجاميع
+    والسند المرافق ومجاميع الدفعة تلقائيًا.
+  </p>
+  <form id="edForm" onsubmit="return false">
+    <div class="grid2">
+      <div><label class="f">رقم الفاتورة</label><input type="text" name="invoice_number" dir="ltr" style="text-align:left" placeholder="INV-0001"></div>
+      <div><label class="f">المشتري (العميل)</label><select name="customer_id"></select></div>
+      <div><label class="f">طريقة السداد</label>
+        <select name="payment_type">
+          <option>نقدي</option><option>آجل</option><option>تحويل</option>
+        </select></div>
+      <div><label class="f">التاريخ</label><input type="date" name="invoice_date"></div>
+      <div><label class="f">الوقت</label><input type="time" name="invoice_time" step="1"></div>
+      <div><label class="f">قالب الفاتورة</label>
+        <select name="template_id">
+          <option value="">الافتراضي</option>
+          {% for t in invoice_templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <label class="f">ملاحظات</label><input type="text" name="notes">
+    <div class="check" style="margin-top:10px; margin-bottom:4px">
+      <input type="checkbox" id="edTaxIncl">
+      <label for="edTaxIncl" style="margin:0">الأسعار شاملة الضريبة (الضريبة محتسبة داخل سعر الوحدة)</label>
+    </div>
+    <div class="hint" id="edTaxNote" style="margin:0 0 8px"></div>
+    <h4 style="margin:10px 0 4px">أصناف الفاتورة</h4>
+    <p class="hint" style="margin:0 0 6px">
+      🔗 اختيار متسلسل من قاعدة البيانات: اختر <b>المجموعة الرئيسية</b> أولًا، فتظهر قائمة
+      <b>الأصناف التابعة لها فقط</b> — وعند اختيار الصنف يُعبَّأ الاسم وسعر الوحدة و<b>وحدة الصنف</b> تلقائيًا (قابلة للتعديل).
+    </p>
+    <table class="tbl" id="edLines">
+      <thead>
+        <tr><th>المجموعة الرئيسية ← الصنف</th><th class="num">الوحدة</th><th class="num">الكمية</th><th class="num">سعر الوحدة</th><th class="num">المبلغ الإجمالي للصنف</th><th>الضريبة</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button class="btn sm ghost" type="button" onclick="addEditLine()">＋ إضافة سطر</button>
+    <button class="btn sm" type="button" onclick="addEditLineFromExtraGroup()">📦 إضافة صنف من مجموعة أخرى</button>
+    <div class="summary-strip" id="edTotals" style="margin-top:8px">
+      💰 الصافي: <b id="edNet">0.00</b> —
+      الضريبة: <b id="edTax">0.00</b> —
+      الإجمالي الشامل: <b id="edGross">0.00</b> ر.س
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" onclick="saveInvoiceEdit()">💾 حفظ التعديل</button>
+      <button class="btn ghost" type="button" onclick="closeDlg('dlgEdit')">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('selAll')?.addEventListener('change', function () {
+  document.querySelectorAll('tr[data-id] input.sel').forEach(cb => cb.checked = this.checked);
+  togglePrintBtn();
+  updateBulkState();
+});
+
+// ── 🟡 تظليل تفاعلي حصري: النقر على أي قسم يظلّله فورًا، والنقر على قسم آخر ──
+//    يزيل التظليل عن القسم السابق وينقله للجديد مباشرة — دون الحاجة للنقر مرة ثانية.
+function clearAllHighlight() {
+  document.querySelectorAll('td.cell-hl').forEach(td => td.classList.remove('cell-hl'));
+  document.querySelectorAll('.seller-name.seller-hl').forEach(el => el.classList.remove('seller-hl'));
+}
+function highlightCell(td) {
+  if (!td || td.tagName !== 'TD') return;
+  const was = td.classList.contains('cell-hl');
+  clearAllHighlight();
+  if (!was) td.classList.add('cell-hl');   // النقر على الخلية نفسها مجددًا يلغي تظليلها
+}
+// ربط تلقائي لكل خلايا جداول اللوحة (الدفعات + الفواتير) — تُستثنى الأزرار والروابط والحقول
+document.addEventListener('click', (ev) => {
+  const pill = ev.target.closest('.seller-name');
+  if (pill && pill.closest('.panel table.tbl')) {
+    const was = pill.classList.contains('seller-hl');
+    clearAllHighlight();
+    if (!was) pill.classList.add('seller-hl');
+    return;
+  }
+  const td = ev.target.closest('td');
+  if (!td || !td.closest('.panel table.tbl')) return;
+  if (ev.target.closest('button, a, input, select, label')) return;
+  highlightCell(td);
+});
+
+// ── 📄 ترقيم صفحات قسم الدفعات: تغيير عدد الدفعات يعود للصفحة الأولى ──
+function setBPerPage(v) {
+  const p = new URLSearchParams(location.search);
+  p.set('b_per_page', v);
+  p.set('b_page', '1');
+  location.href = '/invoices?' + p.toString();
+}
+
+// ── ⚡ التطبيق الجماعي: قالب واحد على كل الفواتير المحددة ──
+function selectedInvoiceIds() {
+  return Array.from(document.querySelectorAll('tr[data-id] input.sel:checked'))
+    .map(i => parseInt(i.value));
+}
+function updateBulkState() {
+  const n = selectedInvoiceIds().length;
+  const cnt = document.getElementById('bulkCount');
+  const btn = document.getElementById('bulkApplyBtn');
+  const sel = document.getElementById('bulkTplSelect');
+  if (cnt) cnt.textContent = n ? `${n} فاتورة محددة` : 'لم تُحدَّد أي فاتورة';
+  if (btn) btn.disabled = !(n && sel && sel.value);
+}
+async function applyBulkTemplate(btn) {
+  const ids = selectedInvoiceIds();
+  if (!ids.length) { toast('اختر فاتورة واحدة على الأقل', true); return; }
+  const sel = document.getElementById('bulkTplSelect');
+  if (!sel || !sel.value) { toast('لا توجد قوالب فواتير — أضفها من شاشة القوالب أولًا', true); return; }
+  btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '⏳ جارٍ التطبيق…';
+  try {
+    const j = await api('/api/invoices/set-template', { ids, template_id: parseInt(sel.value) });
+    toast(`✅ تم تطبيق القالب على ${j.updated} فاتورة مختارة`);
+    setTimeout(() => location.reload(), 600);
+  } catch (e) {
+    toast(e.message, true);
+    btn.disabled = false; btn.textContent = btn.dataset.t;
+  }
+}
+
+// ── 📄 ترقيم الصفحات: تغيير عدد الصفوف يعود للصفحة الأولى ──
+function setPerPage(v) {
+  const p = new URLSearchParams(location.search);
+  p.set('per_page', v);
+  p.set('page', '1');
+  location.href = '/invoices?' + p.toString();
+}
+function exportFilters() {
+  const p = new URLSearchParams(location.search);
+  return {
+    batch_id: p.get('batch_id') || undefined,
+  };
+}
+
+async function exportDocs(mode, btn) {
+  const f = exportFilters();
+  const label = mode === 'zip' ? '🗂 جارٍ تصدير الملفات المنفصلة…' : '📄 جارٍ بناء PDF…';
+  btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = label;
+  try {
+    const j = await api('/api/export', { kind: 'invoice', mode, batch_id: f.batch_id });
+    toast('✅ اكتمل التصدير (' + (j.engine || 'edge') + ') — يبدأ التنزيل…');
+    setTimeout(() => { location.href = '/exports/' + encodeURIComponent(j.file); }, 700);
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = btn.dataset.t;
+  }
+}
+
+async function printSelected(btn) {
+  const ids = Array.from(document.querySelectorAll('tr[data-id] input.sel:checked')).map(i => parseInt(i.value));
+  if (!ids.length) { toast('اختر فاتورة واحدة على الأقل', true); return; }
+  btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '⏳ جارٍ البناء…';
+  try {
+    const j = await api('/api/export', { kind: 'invoice', mode: 'combined', ids });
+    window.open('/exports/' + encodeURIComponent(j.file), '_blank');
+    toast('✅ PDF جاهز — اطبعه من المتصفح');
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = btn.dataset.t; }
+}
+function togglePrintBtn() {
+  const any = document.querySelector('tr[data-id] input.sel:checked');
+  const btn = document.querySelector('button[onclick="printSelected(this)"]');
+  if (btn) { btn.style.outline = any ? '1px solid #0e7490' : 'none'; }
+}
+async function exportOne(id, btn) {
+  btn.disabled = true;
+  try {
+    const j = await api('/api/export', { kind: 'invoice', mode: 'combined', ids: [id] });
+    toast('✅ تم إنشاء PDF الفاتورة');
+    setTimeout(() => { location.href = '/exports/' + encodeURIComponent(j.file); }, 500);
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+}
+
+// ── 📄 تقرير الدفعة (Excel / PDF) ──
+let _repBatch = 0;
+function openReportDlg(batchId) {
+  _repBatch = batchId;
+  document.getElementById('repBatchNo').textContent = batchId;
+  openDlg('dlgReport');
+}
+async function downloadBatchReport(fmt) {
+  try {
+    const j = await api(`/api/batches/${_repBatch}/report?format=${fmt}`);
+    toast('✅ جارٍ تنزيل التقرير…');
+    closeDlg('dlgReport');
+    setTimeout(() => { location.href = '/exports/' + encodeURIComponent(j.file); }, 500);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ── 🎨 قالب الدفعة (المجموعة كاملة) ──
+let _tplBatch = 0;
+function openTemplateDlg(batchId) {
+  _tplBatch = batchId;
+  document.getElementById('tplBatchNo').textContent = batchId;
+  openDlg('dlgTemplate');
+}
+async function applyBatchTemplate() {
+  const sel = document.getElementById('tplSelect');
+  if (!sel.value) { toast('لا توجد قوالب فواتير — أضفها من شاشة القوالب أولًا', true); return; }
+  try {
+    const j = await api(`/api/batches/${_tplBatch}/set-template`, { template_id: parseInt(sel.value) || null });
+    toast(`✅ تم تطبيق القالب على ${j.updated} فاتورة في الدفعة`);
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ── ✏️ التحرير المحمي بكلمة سر التحكم ──
+let _edId = 0;
+// كتالوج المجموعات والأصناف (يُجلب من قاعدة البيانات مرة واحدة ثم يُخزَّن مؤقتًا أثناء الجلسة)
+let _edCatalog = null;
+async function loadEditCatalog() {
+  if (_edCatalog) return _edCatalog;
+  try {
+    const j = await api('/api/items/catalog');
+    _edCatalog = j.groups || [];
+  } catch (e) {
+    _edCatalog = [];
+    toast('تعذر تحميل المجموعات والأصناف: ' + e.message, true);
+  }
+  return _edCatalog;
+}
+async function openEditDlg(id) {
+  _edId = id;
+  try {
+    const j = await api(`/api/invoices/${id}/get`);
+    await loadEditCatalog();
+    const inv = j.invoice;
+    const ed = document.getElementById('edForm');
+    // قائمة العملاء
+    const sel = ed.customer_id;
+    sel.innerHTML = (j.customers || [])
+      .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    sel.value = inv.customer_id;
+    if (sel.value != inv.customer_id) {
+      sel.insertAdjacentHTML('beforeend',
+        `<option value="${inv.customer_id}">${inv.customer_name}</option>`);
+      sel.value = inv.customer_id;
+    }
+    ed.payment_type.value = inv.payment_type;
+    ed.invoice_date.value = inv.invoice_date;
+    ed.invoice_time.value = inv.invoice_time;
+    ed.notes.value = inv.notes;
+    ed.invoice_number.value = inv.invoice_number || '';
+    document.getElementById('edTaxIncl').checked = !!inv.prices_include_tax;
+    ed.template_id.value = inv.template_id || '';
+    // موضع الباركود لم يعد خيارًا — ثُبّت أسفل «المبلغ كتابةً» في كل القوالب
+    document.getElementById('edNum').textContent = inv.invoice_number;
+    const tb = document.querySelector('#edLines tbody');
+    tb.innerHTML = '';
+    (j.lines || []).forEach(ln => tb.appendChild(editLineRow(ln)));
+    if (!tb.children.length) tb.appendChild(editLineRow({}));
+    updateEditTotals();
+    openDlg('dlgEdit');
+  } catch (e) { toast(e.message, true); }
+}
+// بحث عن صنف مطابق بالاسم في الكتالوج (لربط أسطر الفاتورة القائمة بمجموعتها تلقائيًا)
+function _matchCatalogItem(name) {
+  const n = (name || '').trim();
+  if (!n) return null;
+  for (const grp of (_edCatalog || [])) {
+    const it = (grp.items || []).find(x => (x.name || '').trim() === n);
+    if (it) return { grp, it };
+  }
+  return null;
+}
+function editLineRow(ln) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="ed-pick">
+      <select class="ln-group" title="المجموعة الرئيسية"><option value="">— اختر المجموعة الرئيسية —</option></select>
+      <select class="ln-item" disabled title="الأصناف التابعة للمجموعة المختارة فقط"><option value="">— اختر الصنف —</option></select>
+      <button class="btn sm ghost ln-extra" type="button" title="إضافة صنف من مجموعة أخرى">📦 مجموعة أخرى</button>
+      <div class="ln-free"></div>
+      <input type="hidden" class="ln-name" value="">
+    </td>
+    <td><input type="text" class="ln-unit" title="وحدة الصنف — تُعبأ تلقائيًا من قاعدة البيانات ويمكن تعديلها يدويًا" placeholder="حبة" value="${String(ln.unit || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" style="width:80px"></td>
+    <td><input type="number" class="ln-qty" step="any" min="0" value="${ln.quantity ?? 1}" style="width:80px"></td>
+    <td><input type="number" class="ln-price" step="any" min="0" value="${ln.unit_price ?? 0}" style="width:110px"></td>
+    <td class="num"><b class="ln-total">0.00</b></td>
+    <td><span class="badge blue">15% (ثابتة)</span></td>
+    <td><button class="btn sm red" type="button" onclick="this.closest('tr').remove(); updateEditTotals()">🗑</button></td>`;
+  const gsel = tr.querySelector('.ln-group');
+  const isel = tr.querySelector('.ln-item');
+  const nameEl = tr.querySelector('.ln-name');
+  const unitEl = tr.querySelector('.ln-unit');
+  const freeEl = tr.querySelector('.ln-free');
+  // 1) تعبئة قائمة المجموعات الرئيسية من قاعدة البيانات
+  (_edCatalog || []).forEach(gr => gsel.add(new Option(gr.name, gr.id)));
+  // دالة تعبئة أصناف مجموعة معينة في القائمة الثانوية
+  function fillItems(groupId, keepUnit) {
+    isel.innerHTML = '<option value="">— اختر الصنف —</option>';
+    const grp = (_edCatalog || []).find(g => String(g.id) === String(groupId));
+    if (!grp) { isel.disabled = true; return null; }
+    (grp.items || []).forEach(it => {
+      const o = new Option(it.name + (it.unit ? ' — ' + it.unit : ''), it.id);
+      o.dataset.unit = it.unit || '';
+      isel.add(o);
+    });
+    isel.disabled = !(grp.items || []).length;
+    if (!keepUnit) unitEl.value = '';
+    return grp;
+  }
+  // 2) عند اختيار المجموعة: تعبئة القائمة الثانوية بأصناف هذه المجموعة فقط
+  gsel.addEventListener('change', () => { fillItems(gsel.value, false); });
+  // 3) عند اختيار الصنف: تعبئة الاسم والسعر والوحدة تلقائيًا من قاعدة البيانات (الوحدة قابلة للتعديل اليدوي)
+  isel.addEventListener('change', () => {
+    const grp = (_edCatalog || []).find(g => String(g.id) === String(gsel.value));
+    const it = grp && (grp.items || []).find(x => String(x.id) === String(isel.value));
+    if (it) {
+      nameEl.value = it.name;
+      unitEl.value = it.unit || unitEl.value || '';   // ← ربط الوحدة تلقائيًا (يارده/حبة/…) وتبقى قابلة للتعديل
+      if (it.unit_price > 0) tr.querySelector('.ln-price').value = it.unit_price;
+      freeEl.textContent = '';
+      updateEditTotals();
+    }
+  });
+  // زر «مجموعة أخرى» داخل السطر: اختيار مجموعة إضافية لصنف آخر وتنزيل بياناته ووحدته فورًا
+  tr.querySelector('.ln-extra').addEventListener('click', () => pickExtraGroupItem(tr));
+  // الاسم المحفوظ للسطر (يُحدَّث عند اختيار صنف، ويبقى كما هو لأسطر الأصناف غير المرتبطة)
+  nameEl.value = ln.item_name || '';
+  unitEl.value = ln.unit || unitEl.value || '';
+  const m = _matchCatalogItem(ln.item_name);
+  if (m) {
+    gsel.value = String(m.grp.id);
+    fillItems(m.grp.id, true);                        // تعبئة أصناف المجموعة مع الاحتفاظ بوحدة السطر
+    isel.value = String(m.it.id);                     // تحديد الصنف المطابق
+    if (!unitEl.value) unitEl.value = m.it.unit || ''; // وحدة الصنف من قاعدته (مجموعة أبو وليد → يارده …)
+  } else if (ln.item_name) {
+    freeEl.textContent = '⚠ الصنف الأصلي غير مرتبط بمجموعة: ' + ln.item_name;
+  }
+  tr.querySelectorAll('input[type=number]').forEach(inp => inp.addEventListener('input', updateEditTotals));
+  return tr;
+}
+// ── إضافة صنف من مجموعة إضافية: قائمة اختيار للمجموعة ثم الصنف وتنزيل بياناته ووحدته فورًا ──
+async function addEditLineFromExtraGroup() {
+  await loadEditCatalog();
+  if (!(_edCatalog || []).length) { toast('لا توجد مجموعات في قاعدة البيانات', true); return; }
+  const tr = editLineRow({ item_name: '', quantity: 1, unit_price: 0 });
+  document.querySelector('#edLines tbody').appendChild(tr);
+  updateEditTotals();
+  pickExtraGroupItem(tr);
+  toast('اختر المجموعة الإضافية ثم الصنف — ستُعبأ بياناته ووحدته فورًا');
+}
+function pickExtraGroupItem(tr) {
+  const gsel = tr.querySelector('.ln-group'), isel = tr.querySelector('.ln-item');
+  gsel.focus();
+  if (gsel.showPicker) { try { gsel.showPicker(); } catch (e) { /* متصفح لا يدعم */ } }
+}
+// حساب المجاميع الحية (بوحدة الهللة — ضريبة ثابتة 15%) مع دعم وضعي التسعير:
+// غير شاملة: الصافي = الكمية × سعر الوحدة وتُضاف الضريبة عليه
+// شاملة:   المبلغ الإجمالي يشمل الضريبة — الصافي = الإجمالي ÷ 1.15 والضريبة هي الفرق
+const EDIT_TAX_RATE = 0.15;
+const _fmtHal = c => (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function editTaxInclusive() { return !!document.getElementById('edTaxIncl')?.checked; }
+function updateEditTotals() {
+  const incl = editTaxInclusive();
+  let netC = 0, taxC = 0;
+  document.querySelectorAll('#edLines tbody tr').forEach(tr => {
+    const qty = parseFloat(tr.querySelector('.ln-qty')?.value) || 0;
+    const price = parseFloat(tr.querySelector('.ln-price')?.value) || 0;
+    const priceC = Math.round(price * 100);          // هللات
+    const lineC = Math.round(priceC * qty);          // المبلغ الإجمالي للصنف = الكمية × سعر الوحدة
+    let net, tax;
+    if (incl) {
+      net = Math.round(lineC * 100 / (100 + EDIT_TAX_RATE * 100));
+      tax = lineC - net;
+    } else {
+      net = lineC;
+      tax = Math.round(net * EDIT_TAX_RATE);
+    }
+    const tot = tr.querySelector('.ln-total');
+    if (tot) tot.textContent = _fmtHal(lineC);
+    netC += net; taxC += tax;
+  });
+  document.getElementById('edNet').textContent = _fmtHal(netC);
+  document.getElementById('edTax').textContent = _fmtHal(taxC);
+  document.getElementById('edGross').textContent = _fmtHal(netC + taxC);
+  const note = document.getElementById('edTaxNote');
+  if (note) note.textContent = incl
+    ? '💡 الأسعار شاملة الضريبة: المبلغ الإجمالي للصنف يشمل الضريبة — الصافي = الإجمالي ÷ 1.15'
+    : '💡 الضريبة تُضاف على الأسعار: الضريبة = المبلغ الإجمالي للصنف × 15% — الإجمالي الشامل = الصافي + الضريبة';
+}
+document.getElementById('edTaxIncl')?.addEventListener('change', updateEditTotals);
+// مزامنة عنوان النافذة مع رقم الفاتورة أثناء التحرير
+document.querySelector('#edForm [name=invoice_number]')?.addEventListener('input', function () {
+  document.getElementById('edNum').textContent = this.value.trim() || '—';
+});
+async function addEditLine() {
+  await loadEditCatalog();
+  document.querySelector('#edLines tbody')
+    .appendChild(editLineRow({ item_name: '', quantity: 1, unit_price: 0 }));
+  updateEditTotals();
+}
+async function saveInvoiceEdit() {
+  const ed = document.getElementById('edForm');
+  const invoiceNumber = (ed.invoice_number.value || '').trim();
+  if (!invoiceNumber) { toast('رقم الفاتورة مطلوب', true); return; }
+  const sec = window.SECURITY || {};
+  let password = '';
+  if (sec.protect_edit && sec.password_set) {
+    password = prompt('🔒 هذا الإجراء محمي — أدخل كلمة سر التحكم:');
+    if (password === null) return;
+  }
+  const lines = Array.from(document.querySelectorAll('#edLines tbody tr')).map(tr => ({
+    item_name: tr.querySelector('.ln-name').value.trim(),
+    unit: (tr.querySelector('.ln-unit')?.value || '').trim(),   // وحدة الصنف (تلقائية من قاعدته + قابلة للتعديل)
+    quantity: parseFloat(tr.querySelector('.ln-qty').value) || 0,
+    unit_price: parseFloat(tr.querySelector('.ln-price').value) || 0,
+    tax_rate: 15,   // ضريبة القيمة المضافة — قيمة ثابتة 15%
+  }));
+  try {
+    await api(`/api/invoices/${_edId}/update`, {
+      password,
+      invoice_number: invoiceNumber,
+      customer_id: parseInt(ed.customer_id.value) || 0,
+      invoice_date: ed.invoice_date.value,
+      invoice_time: ed.invoice_time.value,
+      payment_type: ed.payment_type.value,
+      notes: ed.notes.value,
+      prices_include_tax: editTaxInclusive(),
+      template_id: ed.template_id.value ? parseInt(ed.template_id.value) : null,
+      lines,
+    });
+    toast('✅ تم حفظ التعديل — تحديثت المجاميع والسند المرافق تلقائيًا');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, true); }
+}
+</script>
+{% endblock %}

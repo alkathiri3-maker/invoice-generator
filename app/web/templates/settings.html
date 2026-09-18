@@ -1,0 +1,368 @@
+{% extends "layout.html" %}
+{% block title %}الإعدادات والأمان — {{ APP_NAME }}{% endblock %}
+{% block page_title %}الإعدادات والأمان{% endblock %}
+{% block content %}
+
+<!-- ══════════ 🔐 كلمة سر التحكم في الصلاحيات ══════════ -->
+<div class="panel">
+  <h2>🔐 كلمة سر التحكم في الصلاحيات</h2>
+  <p class="muted" style="margin-bottom:12px">
+    كلمة السر تحمي الإجراءات الحساسة (حذف البيانات، استعادة النسخ الاحتياطية).
+    تُخزَّن مُعمّاة (PBKDF2) ولا يمكن استعادتها — تُستخدم للتحكم في من يستطيع التعديل أو الحذف.
+    {% if security.password_set %}
+    <span class="badge green">كلمة السر معيّنة</span>
+    {% else %}
+    <span class="badge red">لا توجد كلمة سر</span>
+    {% endif %}
+  </p>
+  <form id="secform" onsubmit="return false">
+    <div class="grid3">
+      {% if security.password_set %}
+      <div><label class="f">كلمة السر الحالية</label><input type="password" name="current_password" autocomplete="current-password"></div>
+      {% endif %}
+      <div><label class="f">{% if security.password_set %}كلمة سر جديدة{% else %}كلمة السر{% endif %} <small>(4 أحرف على الأقل)</small></label><input type="password" name="new_password" autocomplete="new-password"></div>
+      <div><label class="f">تأكيد كلمة السر</label><input type="password" name="confirm_password" autocomplete="new-password"></div>
+    </div>
+    <div class="check"><input type="checkbox" id="pd" {{ 'checked' if security.protect_delete }}><label for="pd">طلب كلمة السر قبل حذف أي بيانات (شركات، عملاء، فواتير، قوالب…)</label></div>
+    <div class="check"><input type="checkbox" id="pe" {{ 'checked' if security.protect_edit }}><label for="pe">طلب كلمة السر قبل تحرير الفاتورة كاملة (يحق للمشرف فقط)</label></div>
+    <div class="check"><input type="checkbox" id="pr" {{ 'checked' if security.protect_restore }}><label for="pr">طلب كلمة السر قبل استعادة أو حذف النسخ الاحتياطية</label></div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" onclick="saveSecurity()">💾 حفظ إعدادات الأمان</button>
+      {% if security.password_set %}
+      <button class="btn red" type="button" onclick="removePassword()">🗑 إزالة كلمة السر</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- ══════════ 💾 النسخ الاحتياطية ══════════ -->
+<div class="panel">
+  <h2>💾 النسخ الاحتياطية</h2>
+  <p class="muted" style="margin-bottom:12px">
+    النسخة تشمل: قاعدة البيانات كاملة + الشعارات + المفاتيح التدريبية.
+    البيانات الحالية: {{ stats.companies }} شركة، {{ stats.customers }} عميل،
+    {{ stats.invoices }} فاتورة، {{ stats.receipts }} سند.
+  </p>
+  <div class="dlg-actions" style="margin-top:0;margin-bottom:14px">
+    <button class="btn" onclick="createBackup()">💾 إنشاء نسخة احتياطية الآن</button>
+    <label class="check" style="margin-top:0"><input type="checkbox" id="bauto" {{ 'checked' if backup_auto }} onchange="toggleAuto(this.checked)">
+      نسخة تلقائية يومية عند بدء التشغيل</label>
+  </div>
+  <div class="dlg-actions" style="margin-top:0;margin-bottom:14px">
+    <label class="btn ghost" style="cursor:pointer">📤 استعادة من ملف ZIP
+      <input type="file" id="restfile" accept=".zip" style="display:none" onchange="restoreUpload(this)">
+    </label>
+  </div>
+  {% if backups %}
+  <table class="tbl">
+    <thead><tr><th>التاريخ</th><th>النوع</th><th>الحجم</th><th>المحتويات</th><th></th></tr></thead>
+    <tbody>
+      {% for b in backups %}
+      <tr>
+        <td><b>{{ b.created_at }}</b></td>
+        <td><span class="badge {{ 'blue' if b.tag == 'تلقائي' else 'green' }}">{{ b.tag }}</span></td>
+        <td class="muted">{{ b.size_h }}</td>
+        <td class="muted" style="font-size:12px">
+          {% if b.counts %}{{ b.counts.get('invoices', 0) }} فاتورة، {{ b.counts.get('companies', 0) }} شركة، {{ b.counts.get('items', 0) }} صنف{% endif %}
+          <div class="backup-name">{{ b.name }}</div>
+        </td>
+        <td style="white-space:nowrap">
+          <a class="btn sm ghost" href="{{ url_for('pages.backup_download', name=b.name) }}">⬇ تنزيل</a>
+          <button class="btn sm" onclick="restoreBackup('{{ b.name }}')">♻ استعادة</button>
+          <button class="btn sm red" onclick="deleteBackup('{{ b.name }}')">🗑 حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">لا توجد نسخ احتياطية بعد — أنشئ أول نسخة الآن 💾</div>
+  {% endif %}
+</div>
+
+<!-- ══════════ 🎨 مظهر البرنامج ══════════ -->
+<div class="panel">
+  <h2>🎨 مظهر البرنامج</h2>
+  <p class="muted" style="margin-bottom:12px">لون الواجهة والشريط الجانبي وشريط التنبيه العام الذي يظهر أعلى كل الشاشات.</p>
+  <form id="uiform" onsubmit="return false">
+    <div class="grid3">
+      <div><label class="f">لون الواجهة (الأزرار والبطاقات)</label><input type="color" name="accent_color" value="{{ ui.accent_color }}"></div>
+      <div><label class="f">الشريط الجانبي — من</label><input type="color" name="sidebar_from" value="{{ ui.sidebar_from }}"></div>
+      <div><label class="f">الشريط الجانبي — إلى</label><input type="color" name="sidebar_to" value="{{ ui.sidebar_to }}"></div>
+    </div>
+    <div class="grid2">
+      <div><label class="f">لون نص التنبيه العام</label><input type="color" name="app_notice_color" value="{{ ui.app_notice_color }}"></div>
+      <div><label class="f">خلفية التنبيه العام</label><input type="color" name="app_notice_bg" value="{{ ui.app_notice_bg }}"></div>
+    </div>
+    <label class="f">نص التنبيه العام 🔔 <small>(يظهر أعلى كل الشاشات — اتركه فارغًا لإخفائه)</small></label>
+    <input type="text" name="app_notice" value="{{ ui.app_notice }}" maxlength="300" placeholder="مثال: صيانة مجدولة يوم الجمعة من 2 إلى 4 فجرًا">
+    <div class="dlg-actions">
+      <button class="btn" type="button" onclick="saveUi()">💾 حفظ المظهر</button>
+      <button class="btn ghost" type="button" onclick="resetUi()">↺ استعادة الافتراضي</button>
+    </div>
+  </form>
+</div>
+
+<!-- ══════════ 🧾 مظهر الفواتير والمستندات ══════════ -->
+<div class="panel">
+  <h2>🧾 مظهر الفواتير والمستندات</h2>
+  <p class="muted" style="margin-bottom:12px">
+    تُطبَّق على كل الفواتير والسندات بجميع القوالب. للتحكم الكامل في تصميم HTML
+    انتقل إلى شاشة <a href="{{ url_for('pages.templates_screen') }}">القوالب</a>.
+  </p>
+  <form id="docform" onsubmit="return false">
+    <div class="grid3">
+      <div>
+        <label class="f">اللون الرئيسي (الترويسة والأعمدة)</label>
+        <input type="color" name="primary_color" value="{{ theme.primary_color }}" style="height:42px;padding:3px">
+      </div>
+      <div>
+        <label class="f">لون العنوان (فاتورة/سند)</label>
+        <input type="color" name="title_color" value="{{ theme.title_color }}" style="height:42px;padding:3px">
+      </div>
+      <div>
+        <label class="f">لون اسم شركة البائع</label>
+        <input type="color" name="seller_name_color" value="{{ theme.seller_name_color }}" style="height:42px;padding:3px">
+      </div>
+    </div>
+    <div class="grid3">
+      <div>
+        <label class="f">نص الترويسة</label>
+        <input type="color" name="header_text_color" value="{{ theme.header_text_color }}" style="height:42px;padding:3px">
+      </div>
+      <div>
+        <label class="f">خط المستندات</label>
+        <select name="font_family">
+          {% for f in font_choices %}<option value="{{ f }}" {{ 'selected' if theme.font_family == f }}>{{ f }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="f">حجم الخط الأساسي</label>
+        <select name="font_size">
+          {% for s in font_sizes %}<option value="{{ s }}" {{ 'selected' if theme.font_size == s }}>{{ s }}px</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid3">
+      <div><label class="f">لون شريط التنبيه</label><input type="color" name="alert_banner_color" value="{{ theme.alert_banner_color }}" style="height:42px;padding:3px"></div>
+      <div><label class="f">خلفية شريط التنبيه</label><input type="color" name="alert_banner_bg" value="{{ theme.alert_banner_bg }}" style="height:42px;padding:3px"></div>
+    </div>
+    <div class="check"><input type="checkbox" id="abe2" {{ 'checked' if theme.alert_banner_enabled }}><label for="abe2">إظهار شريط التنبيه التحذيري أعلى المستند</label></div>
+    <div class="check"><input type="checkbox" id="sw2" {{ 'checked' if theme.show_watermark }}><label for="sw2">إظهار الختم المائي</label></div>
+    <label class="f">نص شريط التنبيه التحذيري</label>
+    <textarea name="alert_banner_text" style="min-height:70px">{{ theme.alert_banner_text }}</textarea>
+    <div class="grid2">
+      <div><label class="f">نص الختم المائي</label><input type="text" name="watermark_text" value="{{ theme.watermark_text }}"></div>
+      <div><label class="f">نص التذييل التحذيري</label><input type="text" name="footer_notice" value="{{ theme.footer_notice }}"></div>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" onclick="saveDocTheme()">💾 حفظ مظهر المستندات</button>
+      <button class="btn ghost" type="button" onclick="previewDoc()">👁 معاينة فاتورة</button>
+      <button class="btn ghost" type="button" onclick="exportThemeXlsx()">📊 تصدير القالب إلى Excel</button>
+      <label class="btn ghost" style="cursor:pointer;margin:0">📥 استيراد القالب من Excel
+        <input type="file" accept=".xlsx" style="display:none" onchange="importThemeXlsx(this)">
+      </label>
+    </div>
+    <p class="muted" style="margin-top:8px">
+      💡 يمكنك تصدير قالب التصميم إلى ملف Excel وتعديل عمود «القيمة» (الألوان، الخط،
+      التنبيهات، الختم المائي) ثم استيراده ليُطبَّق على كل الفواتير والسندات.
+    </p>
+  </form>
+</div>
+
+<!-- ══════════ 🏢 ألوان المؤسسات ══════════ -->
+<div class="panel">
+  <h2>🏢 لون المؤسسة (البائع)</h2>
+  <p class="muted" style="margin-bottom:12px">
+    لون كل شركة يظهر في ترويسة فواتيرها وأعمدة الجدول. لتغيير الشعار والبيانات كاملة انتقل إلى
+    <a href="{{ url_for('pages.companies') }}">الشركات</a>.
+  </p>
+  {% if companies %}
+  <table class="tbl">
+    <thead><tr><th>الشركة</th><th>اللون الحالي</th><th>تغيير اللون</th><th></th></tr></thead>
+    <tbody>
+      {% for c in companies %}
+      <tr data-id="{{ c.id }}" data-name="{{ c.name }}" data-color="{{ c.color }}">
+        <td><b>{{ c.name }}</b></td>
+        <td><span class="swatch" style="background:{{ c.color }}"></span> <span class="backup-name">{{ c.color }}</span></td>
+        <td><input type="color" class="c-picker" data-id="{{ c.id }}" value="{{ c.color }}" style="width:120px"></td>
+        <td><button class="btn sm" onclick="saveCompanyColor(this.closest('tr'))">💾 حفظ</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">لا توجد شركات</div>{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// ── 🔐 الأمان ──
+async function saveSecurity() {
+  const f = document.getElementById('secform');
+  const d = Object.fromEntries(new FormData(f).entries());
+  d.protect_delete = f.querySelector('#pd').checked;
+  d.protect_edit = f.querySelector('#pe').checked;
+  d.protect_restore = f.querySelector('#pr').checked;
+  if (d.new_password && d.new_password !== d.confirm_password) {
+    toast('كلمتا السر غير متطابقتين', true); return;
+  }
+  if (!d.new_password && !d.current_password) {
+    // تغيير مفاتيح الحماية فقط
+    d.new_password = '';
+    d.confirm_password = '';
+  }
+  try {
+    const res = await api('/api/security', d);
+    window.SECURITY = res;
+    toast('✅ تم حفظ إعدادات الأمان');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function removePassword() {
+  const pw = prompt('أدخل كلمة السر الحالية لإزالتها:');
+  if (pw === null) return;
+  try {
+    await api('/api/security', { remove_password: true, current_password: pw });
+    window.SECURITY = { password_set: false, protect_delete: false, protect_edit: false, protect_restore: false };
+    toast('تمت إزالة كلمة السر');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ── 💾 النسخ الاحتياطية ──
+async function createBackup() {
+  try {
+    const res = await api('/api/backup/create', {});
+    toast(`✅ تم إنشاء النسخة (${(res.size / 1024).toFixed(1)} ك.ب)`);
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function toggleAuto(enabled) {
+  try {
+    await api('/api/backup/auto', { enabled });
+    toast(enabled ? '✅ النسخ التلقائي مفعّل (نسخة يومية عند بدء التشغيل)' : 'تم إيقاف النسخ التلقائي');
+  } catch (e) { toast(e.message, true); }
+}
+
+async function restoreBackup(name) {
+  let pw = '';
+  try { pw = askControlPassword(); } catch (e) { return; }
+  confirmThen('♻ استعادة هذه النسخة ستستبدل كل البيانات الحالية (تُنشأ نسخة أمان تلقائيًا قبل الاستعادة). هل تريد المتابعة؟', async () => {
+    try {
+      await api('/api/backup/restore', { name, password: pw });
+      toast('✅ تمت الاستعادة بنجاح');
+      setTimeout(() => location.reload(), 900);
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+async function restoreUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  let pw = '';
+  try { pw = askControlPassword(); } catch (e) { input.value = ''; return; }
+  confirmThen('♻ استعادة الملف ستستبدل كل البيانات الحالية (تُنشأ نسخة أمان تلقائيًا). هل تريد المتابعة؟', async () => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (pw) fd.append('password', pw);
+    try {
+      await api('/api/backup/restore', fd);
+      toast('✅ تمت الاستعادة بنجاح');
+      setTimeout(() => location.reload(), 900);
+    } catch (e) { toast(e.message, true); }
+    input.value = '';
+  });
+}
+
+async function deleteBackup(name) {
+  let pw = '';
+  try { pw = askControlPassword(); } catch (e) { return; }
+  confirmThen('هل تريد حذف هذه النسخة الاحتياطية؟ لا يمكن التراجع.', async () => {
+    try {
+      await api('/api/backup/delete', { name, password: pw });
+      toast('تم حذف النسخة');
+      setTimeout(() => location.reload(), 400);
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+// ── 🎨 مظهر البرنامج ──
+async function saveUi() {
+  const f = document.getElementById('uiform');
+  const d = Object.fromEntries(new FormData(f).entries());
+  try {
+    await api('/api/ui', d);
+    toast('✅ تم حفظ مظهر البرنامج');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function resetUi() {
+  try {
+    await api('/api/ui', {
+      accent_color: '#0e7490', sidebar_from: '#0c4a6e', sidebar_to: '#164e63',
+      app_notice_color: '#b45309', app_notice_bg: '#fffbeb', app_notice: '',
+    });
+    toast('تمت استعادة المظهر الافتراضي');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ── 🧾 مظهر المستندات ──
+async function saveDocTheme() {
+  const f = document.getElementById('docform');
+  const d = Object.fromEntries(new FormData(f).entries());
+  d.alert_banner_enabled = f.querySelector('#abe2').checked;
+  d.show_watermark = f.querySelector('#sw2').checked;
+  try {
+    await api('/api/theme', d);
+    toast('✅ تم الحفظ — سيُطبق على كل المستندات الجديدة');
+  } catch (e) { toast(e.message, true); }
+}
+
+function previewDoc() {
+  const url = {{ preview_url | tojson }} || {{ url_for('pages.templates_screen') | tojson }};
+  saveDocTheme().then(() => setTimeout(() => window.open(url, '_blank'), 400));
+}
+
+// ── 📊 قالب التصميم عبر Excel (تصدير للتعديل + استيراد للتطبيق) ──
+async function exportThemeXlsx() {
+  try {
+    const j = await api('/api/theme/export');
+    toast('✅ جارٍ تنزيل قالب التصميم…');
+    setTimeout(() => { location.href = '/exports/' + encodeURIComponent(j.file); }, 500);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function importThemeXlsx(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const j = await api('/api/theme/import', fd);
+    toast(`✅ تم تطبيق قالب التصميم (${j.updated} إعدادًا) على كل المستندات`);
+    setTimeout(() => location.reload(), 900);
+  } catch (e) { toast(e.message, true); }
+  input.value = '';
+}
+
+// ── 🏢 ألوان المؤسسات ──
+async function saveCompanyColor(tr) {
+  const picker = tr.querySelector('.c-picker');
+  const fd = new FormData();
+  fd.append('id', tr.dataset.id);
+  fd.append('name', tr.dataset.name);
+  fd.append('color', picker.value);
+  fd.append('keep_logo', '1');
+  try {
+    await api('/api/companies', fd);
+    tr.dataset.color = picker.value;
+    tr.querySelector('.swatch').style.background = picker.value;
+    toast('✅ تم تحديث لون المؤسسة');
+  } catch (e) { toast(e.message, true); }
+}
+</script>
+{% endblock %}

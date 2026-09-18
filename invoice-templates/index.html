@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>قوالب الفواتير - Invoice Templates</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .header small {
+            font-size: 13px;
+            opacity: 0.8;
+            display: block;
+            margin-top: 10px;
+        }
+
+        /* Templates Grid */
+        .templates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .template-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .template-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .template-preview {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #666;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .template-preview.corporate {
+            background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%);
+        }
+
+        .template-preview.modern {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .template-preview.classic {
+            background: #f0f0f0;
+            border: 3px solid #000;
+        }
+
+        .template-preview.thermal {
+            background: white;
+            border: 2px dashed #999;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .template-content {
+            padding: 25px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .template-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .template-description {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        .template-features {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            color: #555;
+        }
+
+        .feature:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature::before {
+            content: '✓';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 16px;
+            font-size: 11px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-preview {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-preview:hover {
+            background: #5568d3;
+        }
+
+        .btn-download {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-download:hover {
+            background: #e8e8e8;
+        }
+
+        /* Features Section */
+        .features-section {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .features-section h2 {
+            font-size: 24px;
+            margin-bottom: 25px;
+            color: #333;
+            text-align: center;
+        }
+
+        .features-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+        }
+
+        .feature-item {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-right: 4px solid #667eea;
+        }
+
+        .feature-item h3 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .feature-item p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* Comparison Table */
+        .comparison-section {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        .comparison-section h2 {
+            font-size: 24px;
+            margin-bottom: 25px;
+            color: #333;
+            text-align: center;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .comparison-table th {
+            background: #f0f0f0;
+            padding: 12px;
+            text-align: right;
+            font-weight: 700;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .comparison-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .comparison-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Footer */
+        .footer {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer p {
+            margin-bottom: 10px;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .templates-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .comparison-section {
+                padding: 20px;
+            }
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 90vw;
+            height: 90vh;
+            overflow: auto;
+        }
+
+        .modal-close {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+        }
+
+        .modal-close:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>قوالب الفواتير الضريبية</h1>
+            <p>Professional Invoice Templates for ZATCA Compliance</p>
+            <small>RTL Arabic + English | Print-Friendly | Fully Customizable</small>
+        </div>
+
+        <!-- Templates Grid -->
+        <div class="templates-grid">
+            <!-- Corporate-Minimal -->
+            <div class="template-card">
+                <div class="template-preview corporate">
+                    Corporate<br/>Minimal
+                </div>
+                <div class="template-content">
+                    <h3 class="template-name">Corporate Minimal</h3>
+                    <p class="template-description">
+                        Clean, professional design with modern top banner. Ideal for B2B invoices with structured layouts and clear tax breakdown.
+                    </p>
+                    <div class="template-features">
+                        <div class="feature">Modern design</div>
+                        <div class="feature">Blue branding</div>
+                        <div class="feature">Bank details</div>
+                        <div class="feature">A4 format</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-preview" onclick="previewTemplate('corporate-minimal.html')">Preview</button>
+                        <a href="corporate-minimal.html" download class="btn btn-download">Download</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modern-Card -->
+            <div class="template-card">
+                <div class="template-preview modern">
+                    Modern<br/>Card
+                </div>
+                <div class="template-content">
+                    <h3 class="template-name">Modern Card</h3>
+                    <p class="template-description">
+                        Elegant contemporary design with gradient header and card-based layout. Features QR code for e-invoicing.
+                    </p>
+                    <div class="template-features">
+                        <div class="feature">Gradient design</div>
+                        <div class="feature">QR code ready</div>
+                        <div class="feature">Card layout</div>
+                        <div class="feature">A4 format</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-preview" onclick="previewTemplate('modern-card.html')">Preview</button>
+                        <a href="modern-card.html" download class="btn btn-download">Download</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classic-Formal -->
+            <div class="template-card">
+                <div class="template-preview classic">
+                    Classic<br/>Formal
+                </div>
+                <div class="template-content">
+                    <h3 class="template-name">Classic Formal</h3>
+                    <p class="template-description">
+                        Traditional formal layout with heavy borders. Includes signature/stamp lines and terms & conditions section.
+                    </p>
+                    <div class="template-features">
+                        <div class="feature">Formal style</div>
+                        <div class="feature">Signature lines</div>
+                        <div class="feature">Terms section</div>
+                        <div class="feature">A4 format</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-preview" onclick="previewTemplate('classic-formal.html')">Preview</button>
+                        <a href="classic-formal.html" download class="btn btn-download">Download</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compact-Thermal -->
+            <div class="template-card">
+                <div class="template-preview thermal">
+                    Compact<br/>Thermal
+                </div>
+                <div class="template-content">
+                    <h3 class="template-name">Compact Thermal</h3>
+                    <p class="template-description">
+                        POS-style receipt format optimized for 80mm thermal printers. Perfect for retail and quick transactions.
+                    </p>
+                    <div class="template-features">
+                        <div class="feature">80mm width</div>
+                        <div class="feature">Receipt style</div>
+                        <div class="feature">QR code</div>
+                        <div class="feature">POS ready</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-preview" onclick="previewTemplate('compact-thermal.html')">Preview</button>
+                        <a href="compact-thermal.html" download class="btn btn-download">Download</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features-section">
+            <h2>Key Features</h2>
+            <div class="features-list">
+                <div class="feature-item">
+                    <h3>🌍 RTL Arabic Support</h3>
+                    <p>Full bidirectional text support for Arabic and English with proper alignment and formatting.</p>
+                </div>
+                <div class="feature-item">
+                    <h3>📄 Print Friendly</h3>
+                    <p>Optimized CSS for printing with proper margins, page breaks, and high-quality output.</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🔧 Fully Customizable</h3>
+                    <p>Clean inline CSS with easy-to-modify variables for colors, fonts, and branding.</p>
+                </div>
+                <div class="feature-item">
+                    <h3>💰 ZATCA Compliant</h3>
+                    <p>Includes VAT breakdown, QR codes, and all required tax information fields.</p>
+                </div>
+                <div class="feature-item">
+                    <h3>📱 Responsive Design</h3>
+                    <p>Works on desktop, tablet, and mobile devices with optimized layouts.</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🎨 Commercial Ready</h3>
+                    <p>Professional designs suitable for immediate use in production systems.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="comparison-section">
+            <h2>Template Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Corporate</th>
+                        <th>Modern</th>
+                        <th>Classic</th>
+                        <th>Thermal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Print Format</strong></td>
+                        <td>A4</td>
+                        <td>A4</td>
+                        <td>A4</td>
+                        <td>80mm Receipt</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Design Style</strong></td>
+                        <td>Professional</td>
+                        <td>Contemporary</td>
+                        <td>Formal</td>
+                        <td>Compact</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Primary Use</strong></td>
+                        <td>B2B Invoices</td>
+                        <td>Tech/Modern</td>
+                        <td>Government</td>
+                        <td>Retail/POS</td>
+                    </tr>
+                    <tr>
+                        <td><strong>QR Code</strong></td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Signature Lines</strong></td>
+                        <td>No</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Color Scheme</strong></td>
+                        <td>Blue/Gray</td>
+                        <td>Gradient</td>
+                        <td>Black/White</td>
+                        <td>Monochrome</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Complexity</strong></td>
+                        <td>Medium</td>
+                        <td>Medium</td>
+                        <td>High</td>
+                        <td>Low</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>ZATCA-Compliant Invoice Templates</strong></p>
+            <p>Professional templates for the Saudi and Gulf markets with full RTL Arabic support</p>
+            <p>
+                <a href="README.md" download>📖 Documentation</a> •
+                All templates include VAT (15%), Bank Details, and ZATCA QR Code support
+            </p>
+            <p style="margin-top: 20px; color: #999; font-size: 12px;">
+                Version 1.0 • Ready for Production • Fully Customizable
+            </p>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal">
+        <button class="modal-close" onclick="closePreview()">×</button>
+        <div class="modal-content" id="previewContent"></div>
+    </div>
+
+    <script>
+        function previewTemplate(templateFile) {
+            const modal = document.getElementById('previewModal');
+            const content = document.getElementById('previewContent');
+
+            fetch(templateFile)
+                .then(response => response.text())
+                .then(html => {
+                    // Replace variables with sample data
+                    const sampleData = {
+                        'company_name': 'شركة التقنية المتقدمة<br/>Advanced Tech Solutions',
+                        'company_address': 'الرياض - المملكة العربية السعودية',
+                        'company_full_address': 'الرياض، منطقة العليا، الشارع الخامس<br/>Riyadh, Saudi Arabia',
+                        'company_phone': '+966-11-4444444',
+                        'company_email': 'info@techadvanced.com',
+                        'company_website': 'www.techadvanced.com',
+                        'vat_number': '123456789012345',
+                        'invoice_number': 'INV-2024-0001',
+                        'invoice_date': '2024-01-15',
+                        'due_date': '2024-02-15',
+                        'customer_name': 'شركة العميل الرائدة',
+                        'customer_address': 'جدة - المملكة العربية السعودية',
+                        'customer_tax_id': '987654321098765',
+                        'customer_phone': '+966-12-5555555',
+                        'subtotal': '100,000.00',
+                        'vat_amount': '15,000.00',
+                        'discount': '0.00',
+                        'grand_total': '115,000.00',
+                        'bank_name': 'بنك الراجحي',
+                        'bank_iban': 'SA0210000000000001234567890',
+                        'bank_account': '1234567890',
+                        'bank_swift': 'RJHISASE',
+                        'payment_method': 'تحويل بنكي / Bank Transfer',
+                        'qr_code': '[ZATCA QR Code]'
+                    };
+
+                    let rendered = html;
+                    for (const [key, value] of Object.entries(sampleData)) {
+                        rendered = rendered.replace(new RegExp(`{{${key}}}`, 'g'), value);
+                    }
+
+                    // Simple item loop replacement
+                    rendered = rendered.replace(/{{#items}}[\s\S]*?{{\/items}}/g, `
+                        <tr>
+                            <td><div class="item-name">خدمة استشارية</div></td>
+                            <td>10</td>
+                            <td>1,000.00 ر.س</td>
+                            <td>1,500.00 ر.س</td>
+                            <td>11,500.00 ر.س</td>
+                        </tr>
+                        <tr>
+                            <td><div class="item-name">تطوير التطبيقات</div></td>
+                            <td>5</td>
+                            <td>18,000.00 ر.س</td>
+                            <td>13,500.00 ر.س</td>
+                            <td>103,500.00 ر.س</td>
+                        </tr>
+                    `);
+
+                    content.innerHTML = rendered;
+                    modal.classList.add('active');
+                });
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').classList.remove('active');
+        }
+
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closePreview();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<style>
+  /* مظهر الواجهة — من إعدادات «الإعدادات والأمان» */
+  :root { --primary: {{ ui.accent_color }}; --primary-dark: {{ ui.accent_dark }}; --primary-light: {{ ui.accent_light }}; }
+  .sidebar { background: linear-gradient(180deg, {{ ui.sidebar_from }}, {{ ui.sidebar_to }}); }
+  .sidebar nav a.active { background: #fff; color: var(--primary-dark); }
+</style>
+</head>
+<body>
+<script>window.SECURITY = {{ security | tojson }};</script>
+<aside class="sidebar">
+  <div class="brand">💼 {{ APP_NAME }}<small>نسخة تدريبية — إتقان v{{ APP_VERSION }}</small></div>
+  <nav>
+    {% for group in nav_groups %}
+    <div class="group-title">{{ group.title }}</div>
+    {% for endpoint, label, icon in group.links %}
+    <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint == endpoint }}">
+      <span class="ic">{{ icon }}</span>{{ label }}
+    </a>
+    {% endfor %}
+    {% endfor %}
+  </nav>
+  <div class="side-actions">
+    {% if admin_gate and admin_gate.is_default %}
+    <div class="side-note">🔑 كلمة مرور المشرف الافتراضية: <b>admin123</b><br><small>غيّرها من لوحة المشرف</small></div>
+    {% endif %}
+    <a class="logout-btn" href="{{ url_for('pages.admin_logout') }}">🚪 تسجيل الخروج</a>
+  </div>
+  <div class="side-note">⚠ جميع المخرجات تدريبية<br>غير صالحة للاستخدام الرسمي</div>
+</aside>
+<main>
+  {% if ui.app_notice %}
+  <div class="notice-bar" style="background:{{ ui.app_notice_bg }};color:{{ ui.app_notice_color }}">
+    🔔 {{ ui.app_notice }}
+  </div>
+  {% endif %}
+  <header class="topbar">
+    <h1>{% block page_title %}{% endblock %}</h1>
+    <div class="actions">{% block actions %}{% endblock %}</div>
+  </header>
+  <section class="content">{% block content %}{% endblock %}</section>
+</main>
+<div id="toast" class="toast"></div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

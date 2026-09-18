@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>فاتورة ضريبية</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700;800&family=Noto+Naskh+Arabic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+  @media print {
+    /* ضمان طباعة الألوان والخلفيات (ومنع اختفاء الباركود) في كل المتصفحات */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff !important; margin: 0 !important; }
+    .doc-root { margin: 0 auto !important; box-shadow: none !important; }
+    /* الباركود الضريبي أسفل المبلغ كتابة — 54مم سهل المسح بكاميرا الجوال حتى بالمرحلة الثانية (85×85 وحدة) */
+    .inv-qr {
+      display: block !important; margin: 0 auto; visibility: visible !important; opacity: 1 !important;
+      width: 54mm !important; height: 54mm !important;
+      border: 1px solid #065f46 !important; padding: 2mm !important; background: #fff !important;
+      page-break-inside: avoid; break-inside: avoid;
+    }
+  }
+</style>
+</head>
+<body style="font-family:'Amiri','Noto Naskh Arabic',serif;color:#111827;background:#fff;">
+<div class="doc-root" style="width:200mm;min-height:282mm;margin:0 auto;padding:9mm;border:3px double #065f46;background:#fff;">
+  <div style="text-align:center;border-bottom:1.5px solid #065f46;padding-bottom:4mm;margin-bottom:5mm;">
+    <div style="font-size:10.5px;letter-spacing:3px;color:#065f46;">المملكة العربية السعودية — المملكة</div>
+    <div style="font-size:10.5px;letter-spacing:3px;color:#065f46;">KINGDOM OF SAUDI ARABIA</div>
+    <div style="font-size:10.5px;margin-top:2mm;color:#374151;">هيئة الزكاة والضريبة والخرج — ZATCA</div>
+    <h1 style="font-size:26px;color:#065f46;margin:3mm 0 1mm;font-weight:700;letter-spacing:1px;">فاتورة ضريبية</h1>
+    <div style="font-size:13px;color:#6b7280;font-style:italic;">Tax Invoice</div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6mm;margin-bottom:5mm;">
+    <div style="flex:1.2;">
+      <div style="font-size:10.5px;color:#065f46;letter-spacing:2px;font-weight:bold;margin-bottom:1mm;">الممول / البائع</div>
+      <div style="font-size:15px;font-weight:700;color:#111827;">{{ company.name }}</div>
+      <div style="font-size:11.5px;line-height:1.8;color:#374151;border-right:3px solid #065f46;padding-right:3mm;margin-top:1.5mm;">{{ company.address }}<br><b>الرقم الضريبي:</b> {{ company.tax_number }}{% if company.cr_number %}<br><b>السجل التجاري:</b> {{ company.cr_number }}{% endif %}</div>
+    </div>
+    {% if company.logo_data_uri %}<img src="{{ company.logo_data_uri }}" style="width:30mm;height:30mm;object-fit:contain;border:1.5px solid #065f46;padding:2mm;">{% endif %}
+    <div style="flex:1;border:1.5px solid #065f46;padding:3mm 4mm;">
+      <div style="font-size:10.5px;color:#065f46;letter-spacing:2px;font-weight:bold;">بيانات الفاتورة</div>
+      <div style="font-size:11.5px;line-height:1.9;margin-top:1.5mm;color:#111827;">
+        <b>رقم الفاتورة:</b> {{ inv.number }}<br>
+        <b>التاريخ:</b> {{ inv.date_display }}<br>
+        <b>الوقت:</b> {{ inv.time_display }}<br>
+        <b>طريقة الدفع:</b> {{ inv.payment_type }}
+      </div>
+    </div>
+  </div>
+  <div style="border:1.5px solid #065f46;padding:3mm 4mm;margin-bottom:5mm;background:#f0fdf4;">
+    <div style="font-size:10.5px;color:#065f46;letter-spacing:2px;font-weight:bold;">المشترى / العميل</div>
+    <div style="font-size:14px;font-weight:700;margin-top:1mm;">{{ customer.name }}</div>
+    <div style="font-size:11.5px;line-height:1.7;color:#374151;">{{ customer.address }}{% if customer.tax_number %} — الرقم الضريبي: {{ customer.tax_number }}{% endif %}{% if customer.cr_number %} — السجل التجاري: {{ customer.cr_number }}{% endif %}{% if customer.phone %} — جوال: {{ customer.phone }}{% endif %}</div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#065f46;color:#fff;">
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:8mm;">م</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;text-align:right;">بيان الصنف</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:14mm;">الوحدة</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:14mm;">الكمية</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:22mm;">سعر الوحدة</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:20mm;">المبلغ الصافي</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:20mm;">الضريبة 15%</th>
+        <th style="padding:3mm 1.5mm;border:1px solid #065f46;width:24mm;">المبلغ الإجمالي</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ln in inv.lines %}
+      <tr>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;text-align:center;">{{ loop.index }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;text-align:right;font-weight:600;">{{ ln.name }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;text-align:center;">{{ ln.unit }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;text-align:center;">{{ ln.quantity_display }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;">{{ ln.unit_price_display }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;">{{ ln.line_net_display }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;">{{ ln.line_tax_display }}</td>
+        <td style="padding:2.5mm 1.5mm;border:1px solid #d1d5db;font-weight:700;">{{ ln.line_gross_display }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="display:flex;justify-content:space-between;margin-top:5mm;gap:6mm;">
+    <div style="flex:1.4;">
+      <div style="border:1.5px solid #065f46;padding:3mm 4mm;background:#f0fdf4;line-height:1.9;font-size:12px;"><b>المبلغ بالحروف:</b><br>{{ inv.total_words }}</div>
+      {% if inv.qr_img %}
+      <div style="margin-top:4mm;text-align:center;">
+        <img class="inv-qr" src="{{ inv.qr_img }}" style="width:54mm;height:54mm;border:1px solid #065f46;padding:2mm;" alt="رمز التحقق الضريبي — فاتورة {{ inv.number }}">
+        <div style="font-size:10px;color:#065f46;margin-top:1.5mm;letter-spacing:1px;">رمز التحقق الضريبي — TLV QR</div>
+      </div>
+      {% endif %}
+      {% if inv.notes %}<div style="margin-top:3mm;border:1px dashed #065f46;padding:2.5mm 3mm;font-size:11px;color:#374151;">📝 ملاحظات: {{ inv.notes }}</div>{% endif %}
+    </div>
+    <table style="flex:1;border-collapse:collapse;font-size:12px;">
+      <tr><td style="padding:2.5mm 3mm;border:1px solid #065f46;background:#f0fdf4;font-weight:700;">الإجمالي الصافي</td><td style="padding:2.5mm 3mm;border:1px solid #065f46;">{{ inv.subtotal_display }} ر.س</td></tr>
+      <tr><td style="padding:2.5mm 3mm;border:1px solid #065f46;background:#f0fdf4;font-weight:700;">ضريبة القيمة المضافة 15%</td><td style="padding:2.5mm 3mm;border:1px solid #065f46;">{{ inv.tax_display }} ر.س</td></tr>
+      <tr style="background:#065f46;color:#fff;"><td style="padding:3mm 3mm;border:1px solid #065f46;font-weight:700;font-size:14px;">الإجمالي شامل الضريبة</td><td style="padding:3mm 3mm;border:1px solid #065f46;font-weight:900;font-size:15px;">{{ inv.total_display }} ر.س</td></tr>
+    </table>
+  </div>
+  <div style="text-align:center;margin-top:5mm;border-top:1.5px double #065f46;padding-top:3mm;font-size:11px;color:#374151;">
+    صدرت هذه الفاتورة وفقًا لأنظمة هيئة الزكاة والضريبة والخرج — المملكة العربية السعودية
+  </div>
+</div>
+</body>
+</html>
