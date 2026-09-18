@@ -8,7 +8,8 @@ import os
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+# مفتاح سري فريد يتغير في كل مرة لإلغاء الجلسات القديمة
+app.secret_key = os.environ.get("SECRET_KEY", "new-secret-key-2026-09-18-v2")
 
 # نموذج بيانات المستخدمين (في الإنتاج: استخدم قاعدة بيانات)
 USERS = {
@@ -364,11 +365,17 @@ TRAINEE_DASHBOARD = """
 </html>
 """
 
+# Middleware: فرض تسجيل الدخول على جميع الصفحات ما عدا /login و /health
+@app.before_request
+def before_request():
+    if request.endpoint and request.endpoint not in ["login", "health", "static"]:
+        if "user" not in session:
+            return redirect(url_for("login"))
+
 @app.route("/")
 def index():
-    if "user" in session:
-        return redirect(url_for("dashboard"))
-    return redirect(url_for("login"))
+    # الصفحة الرئيسية: اذهب مباشرة إلى Dashboard
+    return redirect(url_for("dashboard"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -388,9 +395,7 @@ def login():
 
 @app.route("/dashboard")
 def dashboard():
-    if "user" not in session:
-        return redirect(url_for("login"))
-
+    # الحماية من middleware
     user_name = session.get("name", "المستخدم")
     role = session.get("role", "")
 
