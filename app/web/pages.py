@@ -66,8 +66,9 @@ def _nav():
 
 
 @bp.route("/")
-def login():
-    return render_template("login.html")
+def index():
+    # الصفحة الرئيسية - عرض لوحة المعلومات مباشرة
+    return dashboard()
 
 @bp.route("/dashboard")
 def dashboard():

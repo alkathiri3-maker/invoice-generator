@@ -72,23 +72,8 @@ def create_app() -> Flask:
         if conn is not None:
             conn.close()
 
-    # ── بوابة حماية المشرف (Admin Gateway) ──
-    # كل صفحات وواجهات البرنامج محمية بكلمة مرور المشرف (الافتراضية admin123)
-    # إلا: صفحة تسجيل الدخول/الخروج، الملفات الثابتة، والملفات المرفوعة/المصدّرة.
-    @app.before_request
-    def _admin_gate():
-        from flask import redirect, session, url_for, jsonify as _jsonify
-        ep = request.endpoint
-        if ep is None:
-            return None
-        if ep in ("static", "pages.login", "pages.admin_login", "pages.admin_logout",
-                  "pages.uploads", "pages.exports"):
-            return None
-        if session.get("admin_ok"):
-            return None
-        if request.path.startswith("/api/"):
-            return _jsonify({"ok": False, "error": "تسجيل دخول المشرف مطلوب (كلمة المرور الافتراضية: admin123)"}), 401
-        return redirect(url_for("pages.admin_login", next=request.full_path))
+    # ── بدون حماية - النسخة التجريبية المفتوحة ──
+    # التطبيق متاح للجميع بدون تسجيل دخول في النسخة الحالية
 
     # ── المسارات ──
     from app.web.pages import bp as pages_bp
